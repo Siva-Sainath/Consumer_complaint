@@ -28,6 +28,7 @@
 .suggestion.review-chip{background:var(--teal);color:#fff;border-color:var(--teal)}
 .suggestion.review-chip:hover{background:var(--teal2);border-color:var(--teal2);color:#fff}
 .composer{border-radius:999px;padding:4px 6px 4px 16px;box-shadow:0 4px 20px rgba(27,57,51,.06)}
+.composer.is-dragging{outline:2px dashed var(--saffron);outline-offset:4px;background:#fffaf1}
 .composer input{padding:12px 0}
 .attach-button{width:36px;height:36px;border:1px solid #d6ded7;border-radius:50%;background:rgba(255,255,255,.6);color:var(--teal);font:400 24px/1 'DM Sans';cursor:pointer;display:grid;place-items:center}
 .attach-button:hover{background:#fff;border-color:var(--saffron);color:var(--saffron)}

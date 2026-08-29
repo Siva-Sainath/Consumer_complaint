@@ -361,8 +361,8 @@ function renderAttachmentHint() {
       ? `${state.attachments.length} evidence file${state.attachments.length === 1 ? '' : 's'} attached`
       : 'Photos, videos, or receipts welcome';
 }
-async function handleAttachments(event) {
-  const files = [...(event.target.files || [])];
+async function processAttachments(files) {
+  files = [...files];
   const accepted = files.filter((file) => (/^(image|video)\//.test(file.type) || file.type === 'application/pdf') && file.size <= 50 * 1024 * 1024);
   const available = Math.max(0, 3 - state.attachments.length);
   const selected = accepted.slice(0, available);
@@ -392,6 +392,9 @@ async function handleAttachments(event) {
   }
   renderAttachmentHint();
   renderState();
+}
+async function handleAttachments(event) {
+  await processAttachments(event.target.files || []);
   event.target.value = '';
 }
 async function createIssue(contacts = []) {
@@ -524,6 +527,20 @@ $('sendButton').onclick=send; input.addEventListener('keydown',e=>{if(e.key==='E
 if ($('attachButton') && $('attachmentInput')) {
   $('attachButton').onclick = () => $('attachmentInput').click();
   $('attachmentInput').addEventListener('change', handleAttachments);
+  const composer = $('keyboardComposer');
+  composer.addEventListener('dragenter', (event) => {
+    event.preventDefault();
+    composer.classList.add('is-dragging');
+  });
+  composer.addEventListener('dragover', (event) => event.preventDefault());
+  composer.addEventListener('dragleave', (event) => {
+    if (!composer.contains(event.relatedTarget)) composer.classList.remove('is-dragging');
+  });
+  composer.addEventListener('drop', async (event) => {
+    event.preventDefault();
+    composer.classList.remove('is-dragging');
+    await processAttachments(event.dataTransfer.files || []);
+  });
 }
 const voiceSession = { stream:null, recorder:null, chunks:[], maxTimer:null, startedAt:0 };
 
