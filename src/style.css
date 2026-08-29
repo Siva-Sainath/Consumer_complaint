@@ -29,10 +29,13 @@
 .suggestion.review-chip:hover{background:var(--teal2);border-color:var(--teal2);color:#fff}
 .composer{border-radius:999px;padding:4px 6px 4px 16px;box-shadow:0 4px 20px rgba(27,57,51,.06)}
 .composer input{padding:12px 0}
+.attach-button{width:36px;height:36px;border:1px solid #d6ded7;border-radius:50%;background:rgba(255,255,255,.6);color:var(--teal);font:400 24px/1 'DM Sans';cursor:pointer;display:grid;place-items:center}
+.attach-button:hover{background:#fff;border-color:var(--saffron);color:var(--saffron)}
 .send-button{width:40px!important;height:40px!important;border-radius:50%!important;display:grid;place-items:center;font-size:0!important}
 .voice-toggle{font-size:16px;text-decoration:none;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.6);border:1px solid #d6ded7;display:grid;place-items:center}
 .voice-toggle:hover{background:#fff;border-color:var(--saffron)}
 .composer-foot{align-items:center}
+.composer-foot #attachmentHint{margin-left:auto;color:#8a9790;font-size:9px}
 @media(max-width:520px){.suggestions{padding:4px 16px 8px}}
 .hero-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:26px}
 .primary-action,.secondary-action{min-height:46px;border-radius:999px;padding:11px 18px;font:600 12px 'DM Sans';cursor:pointer}

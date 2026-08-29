@@ -1,6 +1,6 @@
 // A refresh intentionally starts a fresh demo session. Location search results
 // may be cached separately, but complaint content is never restored.
-const state = { fields:{}, messages:0, voicePhase:'IDLE', submitted:false, docket:'', location:null, speaking:true };
+const state = { fields:{}, attachments:[], messages:0, voicePhase:'IDLE', submitted:false, docket:'', location:null, speaking:true };
 const DEVICE_KEY = 'consumer-copilot-demo-device';
 const deviceId = localStorage.getItem(DEVICE_KEY) || (() => {
   const id = `device-${crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`}`;
@@ -174,6 +174,25 @@ function missingField() {
   if (!state.fields.relief) return 'relief';
   return null;
 }
+function deterministicReply() {
+  const missing = missingField();
+  if (state.outOfScope) return `I understand. This is ${state.outOfScope}, so the consumer grievance route isn’t the right avenue. ${scopeGuidance[state.outOfScope]} I can still help with a product or service issue.`;
+  if (!missing) return `Thank you — I’ve captured the complaint and the incident details. You can attach a receipt, bill, photo, or video if you have one, then tap Review your complaint.`;
+  if (missing === 'who') return 'That sounds really frustrating. Who was the seller or service provider? Even an approximate name is fine.';
+  if (missing === 'when') return 'Got it. When and where did this happen? A rough date and city or area is enough.';
+  if (missing === 'relief') return 'Understood. What would feel fair — a refund, replacement, apology, or something else?';
+  return 'I’m keeping track of the details. Tell me a bit more in your own words.';
+}
+function modelAskedForCompletedDetail(reply) {
+  const checks = [
+    ['what', /what (?:problem|happened)|describe (?:the )?(?:problem|issue)|what (?:was|is) wrong/i],
+    ['who', /who (?:was|is) (?:the )?(?:seller|provider|company|involved)/i],
+    ['when', /when (?:did|was)|what date|where did/i],
+    ['relief', /what would you like|what do you want|refund or replacement/i],
+    ['order_reference', /order (?:number|id)|receipt (?:number|details)|invoice/i]
+  ];
+  return checks.some(([field, pattern]) => state.fields[field] && pattern.test(reply));
+}
 function inferComplaint(text) {
   const t = text.toLowerCase();
   const next = {};
@@ -250,15 +269,8 @@ function addSuggestion(label, options=[], photo=false, review=false) {
 function respond(text, modelResult = null) {
   let reply;
   const missing = missingField();
-  if (modelResult?.spoken_response) reply = String(modelResult.spoken_response).trim();
-  else if (state.outOfScope) reply=`I understand. This is ${state.outOfScope}, so the consumer grievance route isn’t the right avenue. ${scopeGuidance[state.outOfScope]} I can still help with a product or service issue.`;
-  else if (!missing) {
-    const route = state.fields.route || 'the right channel';
-    reply=`Thank you — I’ve captured what matters. This looks like a ${route} matter. When you’re ready, tap Review your complaint to check everything before we create a mock docket.`;
-  } else if (missing === 'who') reply='That sounds really frustrating. Who was the seller or service provider? Even an approximate name is fine.';
-  else if (missing === 'when') reply='Got it. When and where did this happen? A rough date and city or area is enough.';
-  else if (missing === 'relief') reply='Understood. What would feel fair — a refund, replacement, apology, or something else?';
-  else reply='I’m keeping track of the details. Tell me a bit more in your own words.';
+  const modelReply = String(modelResult?.spoken_response || '').trim();
+  reply = modelReply && !modelAskedForCompletedDetail(modelReply) ? modelReply : deterministicReply();
   addMessage(reply);
   speak(reply);
 }
@@ -313,11 +325,38 @@ function validContacts(contacts) {
     ? /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(detail)
     : detail.replace(/\D/g, '').length >= 10);
 }
+function renderAttachmentHint() {
+  const hint = $('attachmentHint');
+  if (!hint) return;
+  hint.textContent = state.attachments.length
+    ? `${state.attachments.length} evidence file${state.attachments.length === 1 ? '' : 's'} attached`
+    : 'Photos, videos, or receipts welcome';
+}
+function handleAttachments(event) {
+  const files = [...(event.target.files || [])];
+  const accepted = files.filter((file) => /^(image|video)\//.test(file.type) || file.type === 'application/pdf');
+  const available = Math.max(0, 3 - state.attachments.length);
+  const selected = accepted.slice(0, available);
+  state.attachments.push(...selected.map((file) => ({
+    name: file.name.slice(0, 120),
+    type: file.type,
+    size: file.size
+  })));
+  if (accepted.length > available) addMessage('I can keep up to three evidence files for this complaint.', 'assistant');
+  if (files.length && !accepted.length) addMessage('Please choose a photo, video, or PDF receipt.', 'assistant');
+  if (selected.length) {
+    state.fields.evidence = `${state.attachments.length} supporting file${state.attachments.length === 1 ? '' : 's'} attached`;
+    addMessage(`I’ve noted ${selected.length} evidence file${selected.length === 1 ? '' : 's'} for review.`, 'assistant');
+  }
+  renderAttachmentHint();
+  renderState();
+  event.target.value = '';
+}
 async function createIssue(contacts = []) {
   const response = await fetch('/api/issues', {
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({device_id:deviceId, fields:state.fields, contact_preferences:contacts})
+    body:JSON.stringify({device_id:deviceId, fields:state.fields, attachments:state.attachments, contact_preferences:contacts})
   });
   if (!response.ok) throw new Error('Issue could not be created');
   return response.json();
@@ -416,10 +455,11 @@ function startNewChat() {
   state.audio?.pause();
   finishListening();
   $('verificationBackdrop').hidden = true;
-  Object.assign(state, {fields:{}, messages:0, submitted:false, docket:'', location:null, outOfScope:undefined, aiMode:undefined});
+  Object.assign(state, {fields:{}, attachments:[], messages:0, submitted:false, docket:'', location:null, outOfScope:undefined, aiMode:undefined});
   conversation.innerHTML = WELCOME_HTML;
   suggestions.innerHTML = '';
   input.value = '';
+  renderAttachmentHint();
   $('keyboardComposer').hidden = false;
   $('trackingCard').hidden = true;
   $('locationBadge').hidden = true;
@@ -439,6 +479,10 @@ function startNewChat() {
 }
 
 $('sendButton').onclick=send; input.addEventListener('keydown',e=>{if(e.key==='Enter')send()});
+if ($('attachButton') && $('attachmentInput')) {
+  $('attachButton').onclick = () => $('attachmentInput').click();
+  $('attachmentInput').addEventListener('change', handleAttachments);
+}
 const voiceSession = { stream:null, recorder:null, chunks:[], maxTimer:null, startedAt:0 };
 
 function pickAudioMimeType() {

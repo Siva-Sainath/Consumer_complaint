@@ -13,6 +13,7 @@ function headers(key) {
 
 function cleanIssue(input = {}) {
   const fields = input.fields || {};
+  const attachments = Array.isArray(input.attachments) ? input.attachments : [];
   const channels = Array.isArray(input.contact_preferences) ? input.contact_preferences : [];
   return {
     device_id: String(input.device_id || '').slice(0, 80),
@@ -33,7 +34,12 @@ function cleanIssue(input = {}) {
       amount_paid: String(fields.amount_paid || '').slice(0, 80),
       order_reference: String(fields.order_reference || '').slice(0, 100),
       relief: String(fields.relief || '').slice(0, 180),
-      evidence: String(fields.evidence || '').slice(0, 180)
+      evidence: String(fields.evidence || '').slice(0, 180),
+      attachments: attachments.slice(0, 3).map((item) => ({
+        name: String(item.name || '').slice(0, 120),
+        type: String(item.type || '').slice(0, 80),
+        size: Number.isFinite(item.size) ? Math.min(Math.max(0, item.size), 52428800) : 0
+      }))
     }
   };
 }
