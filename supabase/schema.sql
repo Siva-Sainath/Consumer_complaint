@@ -30,4 +30,13 @@ create index if not exists issue_updates_issue_created_idx on public.issue_updat
 
 alter table public.issues enable row level security;
 alter table public.issue_updates enable row level security;
--- The Vercel API uses the server-only service role key, so no public policy is needed.
+-- Demo-only policies for the publishable key. Do not use these policies for real
+-- personal data; replace them with Supabase Auth/RLS before production.
+drop policy if exists "demo issues read" on public.issues;
+create policy "demo issues read" on public.issues for select to anon using (true);
+drop policy if exists "demo issues create" on public.issues;
+create policy "demo issues create" on public.issues for insert to anon with check (true);
+drop policy if exists "demo updates read" on public.issue_updates;
+create policy "demo updates read" on public.issue_updates for select to anon using (true);
+drop policy if exists "demo updates create" on public.issue_updates;
+create policy "demo updates create" on public.issue_updates for insert to anon with check (true);
