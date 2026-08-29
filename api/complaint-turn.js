@@ -19,7 +19,7 @@ export default async function handler(req, res) {
   const prompt = `Current extracted fields: ${JSON.stringify(current_fields)}\nCitizen message: ${text}`;
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 20000);
+    const timeout = setTimeout(() => controller.abort(), 45000);
     const upstream = await fetch(
       'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent',
       {
@@ -28,7 +28,7 @@ export default async function handler(req, res) {
         body:JSON.stringify({
           systemInstruction:{parts:[{text:SYSTEM_PROMPT}]},
           contents:[{role:'user', parts:[{text:`${prompt}\nRespond with valid JSON only.`}]}],
-          generationConfig:{temperature:0.2, maxOutputTokens:800, responseMimeType:'application/json'}
+          generationConfig:{temperature:0.2, maxOutputTokens:500, responseMimeType:'application/json'}
         }),
         signal:controller.signal
       }

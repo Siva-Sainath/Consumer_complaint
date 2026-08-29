@@ -220,7 +220,7 @@ async function speak(text) {
 }
 async function callGemini(text) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30000);
+  const timeout = setTimeout(() => controller.abort(), 50000);
   try {
     const response = await fetch('/api/complaint-turn', {
       method: 'POST', headers: {'Content-Type':'application/json'},
