@@ -2,8 +2,7 @@ function supabaseConfigured() {
   return Boolean(process.env.SUPABASE_URL && (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY));
 }
 
-function headers() {
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+function headers(key) {
   return {
     apikey: key,
     Authorization: `Bearer ${key}`,
@@ -40,12 +39,20 @@ function cleanIssue(input = {}) {
 }
 
 async function supabaseRequest(path, options = {}) {
-  const response = await fetch(`${process.env.SUPABASE_URL}/rest/v1/${path}`, {
-    ...options,
-    headers: {...headers(), ...(options.headers || {})}
-  });
-  if (!response.ok) throw new Error(`Supabase request failed: ${response.status}`);
-  return response.status === 204 ? null : response.json();
+  const keys = [...new Set([
+    process.env.SUPABASE_ANON_KEY,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  ].filter(Boolean))];
+  let lastStatus = 502;
+  for (const key of keys) {
+    const response = await fetch(`${process.env.SUPABASE_URL}/rest/v1/${path}`, {
+      ...options,
+      headers: {...headers(key), ...(options.headers || {})}
+    });
+    if (response.ok) return response.status === 204 ? null : response.json();
+    lastStatus = response.status;
+  }
+  throw new Error(`Supabase request failed: ${lastStatus}`);
 }
 
 export default async function handler(req, res) {
