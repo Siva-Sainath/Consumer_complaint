@@ -34,7 +34,11 @@ export default async function handler(req, res) {
       }
     );
     clearTimeout(timeout);
-    if (!upstream.ok) return res.status(502).json({error:'AI response service is unavailable'});
+    if (!upstream.ok) {
+      const detail = await upstream.text();
+      console.error('Gemini reasoning error', detail);
+      return res.status(502).json({error:'AI response service is unavailable', detail:detail.slice(0, 300)});
+    }
     const payload = await upstream.json();
     const content = payload.candidates?.[0]?.content?.parts?.map((part) => part.text || '').join('') || '';
     const result = JSON.parse(content.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim());
