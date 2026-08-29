@@ -118,16 +118,19 @@ function speakNative(text, attempt = 0) {
   }
   if (!state.nativeVoice || !voices.includes(state.nativeVoice)) {
     state.nativeVoice = voices.find((item) => hindi && item.lang.toLowerCase().startsWith('hi')) ||
-      voices.find((item) => /samantha|ava|karen|google uk english female/i.test(item.name)) ||
-      voices.find((item) => item.lang.toLowerCase().startsWith('en-in')) ||
-      voices.find((item) => item.lang.toLowerCase().startsWith('en')) || voices[0];
+      voices.find((item) => /samantha|ava|alex|karen|aria|jenny|google (us|uk) english/i.test(item.name)) ||
+      voices.find((item) => item.lang.toLowerCase().startsWith('en-us')) ||
+      voices.find((item) => item.lang.toLowerCase().startsWith('en-gb')) ||
+      voices.find((item) => item.lang.toLowerCase().startsWith('en')) ||
+      voices.find((item) => item.lang.toLowerCase().startsWith('en-in')) || voices[0];
   }
   const preferred = state.nativeVoice;
   const sentences = text.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [text];
   sentences.forEach((sentence, index) => {
     const utterance = new SpeechSynthesisUtterance(sentence.trim());
     if (preferred) utterance.voice = preferred;
-    utterance.rate = 0.88; utterance.pitch = 0.98; utterance.volume = 0.85;
+    utterance.lang = hindi ? 'hi-IN' : (preferred?.lang || 'en-US');
+    utterance.rate = 0.94; utterance.pitch = 1; utterance.volume = 0.95;
     utterance.onstart = () => { if (index === 0) setVoicePhase('SPEAKING'); };
     utterance.onend = () => { if (index === sentences.length - 1) setVoicePhase('IDLE'); };
     window.speechSynthesis.speak(utterance);
