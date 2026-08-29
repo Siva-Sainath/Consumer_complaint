@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f6f1e8" />
+    <meta name="description" content="Consumer Copilot helps Indian consumers turn a frustrating experience into a clear complaint." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/src/style.css" />
+    <title>Consumer Copilot — make your complaint heard</title>
+  </head>
+  <body>
+    <div class="grain" aria-hidden="true"></div>
+    <header class="topbar">
+      <a class="brand" href="#top" aria-label="Consumer Copilot home">
+        <span class="brand-mark">CC</span>
+        <span>consumer<br /><strong>copilot</strong></span>
+      </a>
+      <div class="top-actions">
+        <button class="text-button" id="newChatButton" type="button">New chat</button>
+        <span class="mock-pill"><span class="pulse-dot"></span> Demo</span>
+        <button class="icon-button" id="helpButton" aria-label="About this demo">?</button>
+      </div>
+    </header>
+
+    <main id="top">
+      <section class="hero section-wrap">
+        <div class="hero-copy">
+          <div class="eyebrow"><span class="eyebrow-line"></span> A calmer way to complain</div>
+          <h1>You don’t need the<br /><em>right words.</em></h1>
+          <p class="hero-lede">Tell us what happened. We’ll help turn a frustrating experience into a clear complaint, with the details and direction it needs.</p>
+          <div class="trust-row"><span>● No login to start</span><span>● English, हिंदी, Hinglish</span><span>● Takes about 3 mins</span></div>
+        </div>
+        <div class="hero-note"><span class="note-icon">✦</span><span>Take a breath.<br /><strong>We’ll figure out where this goes.</strong></span></div>
+      </section>
+
+      <section class="workspace section-wrap" aria-label="Complaint intake">
+        <div class="conversation-panel panel">
+          <div class="panel-topline"><div><span class="status-dot" id="statusDot"></span> <span id="statusLabel">Ready to listen</span></div><span class="step-label" id="stepLabel">1 of 3</span></div>
+          <div class="conversation-scroll" id="conversation" aria-live="polite">
+            <div class="date-stamp">TODAY · STARTING FRESH</div>
+            <div class="message assistant-message">
+              <div class="avatar">✦</div>
+              <div><p>Hi. I’m here to help you get this off your chest — and into the right hands.</p><p>What happened? Say it in your own words. <strong>Don’t worry about categories or formal language.</strong></p><span class="message-time">just now</span></div>
+            </div>
+          </div>
+          <div class="suggestions" id="suggestions"></div>
+          <div class="composer-wrap">
+            <div class="voice-stage" id="voiceStage">
+              <button class="mic-button voice-orb" id="micButton" aria-label="Speak your complaint"><span class="mic-icon">⌁</span></button>
+              <p class="voice-status" id="voicePrompt">Tap and speak</p>
+              <p class="voice-substatus" id="voiceSubcopy">I’ll listen until you tap again</p>
+            </div>
+            <div class="composer" id="keyboardComposer">
+              <button class="add-button" id="photoButton" aria-label="Add receipt or product photo">+</button>
+              <input id="messageInput" type="text" autocomplete="off" placeholder="Or type what happened…" aria-label="Describe your complaint" />
+              <button class="send-button" id="sendButton" aria-label="Send message">↑</button>
+            </div>
+            <div class="composer-foot"><span id="voiceHint">HTTPS required for mic on mobile</span><button class="voice-toggle" id="voiceToggle" type="button" aria-pressed="true">Voice replies on</button></div>
+            <input id="photoInput" type="file" accept="image/*" hidden />
+          </div>
+        </div>
+
+        <aside class="case-panel panel" aria-label="Complaint snapshot">
+          <div class="case-header"><div><span class="tiny-label">LIVE SNAPSHOT</span><h2>Your complaint, taking shape</h2></div><span class="spark">✦</span></div>
+          <div class="progress-track"><div id="progressBar" style="width: 0%"></div></div>
+          <div class="progress-copy"><span id="progressText">Ready when you are</span><span id="progressPercent">0%</span></div>
+          <div class="case-fields" id="caseFields">
+            <div class="field empty" data-field="what"><span class="field-icon">◌</span><div><small>WHAT HAPPENED</small><p>Waiting for your story</p></div></div>
+            <div class="field empty" data-field="who"><span class="field-icon">◌</span><div><small>WHO IS INVOLVED</small><p>Seller or service provider</p></div></div>
+            <div class="field empty" data-field="when"><span class="field-icon">◌</span><div><small>WHEN &amp; WHERE</small><p>Date and location</p></div></div>
+            <div class="field empty" data-field="relief"><span class="field-icon">◌</span><div><small>WHAT YOU WANT</small><p>Refund, replacement or other relief</p></div></div>
+          </div>
+          <div class="route-card" id="routeCard"><span class="route-icon">↗</span><div><small>LIKELY ROUTE</small><p id="routeText">We’ll suggest the right place to raise this</p></div></div>
+          <div class="location-badge" id="locationBadge" hidden><span>⌖</span><div><small>APPROVED LOCATION TAG</small><p id="locationText"></p></div></div>
+          <div class="case-footer"><span class="mock-label">MOCKED FOR DEMO</span><span>No government system connected</span></div>
+          <div class="tracking-card" id="trackingCard" hidden>
+            <div class="tracking-title"><span>MOCK TRACKING</span><strong id="docketNumber"></strong></div>
+            <p id="trackingStatus">Draft created for this demo</p>
+            <div class="tracking-line"><span class="tracking-dot active"></span><span>Complaint reviewed</span><span class="tracking-date">Today</span></div>
+            <div class="tracking-line"><span class="tracking-dot"></span><span>Shared with relevant authority</span><span class="tracking-date">Not connected</span></div>
+            <button class="track-action" id="trackAction" type="button">Check mock status again</button>
+            <small>For demonstration only — this number is not a government reference.</small>
+          </div>
+        </aside>
+      </section>
+
+      <section class="how-section section-wrap">
+        <div><span class="tiny-label">DESIGNED FOR THE MOMENT AFTER “ENOUGH.”</span><h2>Less paperwork.<br /><em>More clarity.</em></h2></div>
+        <div class="how-grid"><div><span>01</span><h3>Tell it like it was</h3><p>Voice, text, or a photo. No jargon, no form-filling first.</p></div><div><span>02</span><h3>See it become clear</h3><p>We pull out the facts and ask only for what’s missing.</p></div><div><span>03</span><h3>Know where it goes</h3><p>Get a plain-language route and a mock docket to track.</p></div></div>
+      </section>
+    </main>
+
+    <div class="modal-backdrop" id="modalBackdrop" hidden><div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><button class="modal-close" id="modalClose" aria-label="Close">×</button><span class="tiny-label">ABOUT THIS DEMO</span><h2 id="modalTitle">Built to lower the first hurdle.</h2><p>Consumer Copilot is a prototype for the National Consumer Helpline journey. It is not an official government product. Sensitive information, routing, uploads, and docket numbers are mocked for this demo.</p><div class="disclosure"><span>✓</span><span><strong>What is live</strong><br />The conversational interface, structured case-building, browser voice fallback, optional Groq enhancement, and responsive UI.</span></div><div class="disclosure"><span>◌</span><span><strong>What is mocked</strong><br />Government submission, identity verification, image understanding, persistence, and case status. No government system is connected.</span></div></div></div>
+    <div class="modal-backdrop" id="verificationBackdrop" hidden><div class="modal verification-modal" role="dialog" aria-modal="true" aria-labelledby="verificationTitle"><button class="modal-close" id="verificationClose" aria-label="Close">×</button><span class="tiny-label">FINAL STEP</span><h2 id="verificationTitle">Where should updates go?</h2><p>We have the complaint ready. Add a contact for this demo, then we’ll create your docket.</p><label for="demoMobile">Mobile number</label><input id="demoMobile" class="verification-input" inputmode="numeric" value="9999900000" maxlength="10" /><label for="demoOtp">One-time code</label><input id="demoOtp" class="verification-input" inputmode="numeric" value="123456" maxlength="6" /><div class="captcha-row"><div><label for="demoCaptcha">Enter the code</label><input id="demoCaptcha" class="verification-input" value="7K4M" maxlength="4" /></div><strong>7K4M</strong></div><p class="verification-note">Demo contact details are used only on this device.</p><button id="verifyButton" class="confirm-button">Confirm and create docket</button><button id="skipVerification" class="skip-button" type="button">Continue with demo contact</button></div></div>
+    <script type="module" src="/src/app.js"></script>
+  </body>
+</html>
