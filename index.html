@@ -40,10 +40,10 @@
         <div class="conversation-panel panel">
           <div class="panel-topline"><div><span class="status-dot" id="statusDot"></span> <span id="statusLabel">Ready to listen</span></div><span class="step-label" id="stepLabel">1 of 3</span></div>
           <div class="conversation-scroll" id="conversation" aria-live="polite">
-            <div class="date-stamp">TODAY · STARTING FRESH</div>
+            <div class="date-stamp">Today</div>
             <div class="message assistant-message">
-              <div class="avatar">✦</div>
-              <div><p>Hi. I’m here to help you get this off your chest — and into the right hands.</p><p>What happened? Say it in your own words. <strong>Don’t worry about categories or formal language.</strong></p><span class="message-time">just now</span></div>
+              <div class="avatar assistant-avatar" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8L12 3z" fill="currentColor"/></svg></div>
+              <div class="bubble"><p>Hi. Tell me what happened in your own words — no formal language needed.</p><p><strong>I’ll only ask about what’s still missing.</strong></p></div>
             </div>
           </div>
           <div class="suggestions" id="suggestions"></div>
@@ -54,12 +54,12 @@
               <p class="voice-substatus" id="voiceSubcopy">I’ll listen until you tap again</p>
             </div>
             <div class="composer" id="keyboardComposer">
-              <button class="add-button" id="photoButton" aria-label="Add receipt or product photo">+</button>
-              <input id="messageInput" type="text" autocomplete="off" placeholder="Or type what happened…" aria-label="Describe your complaint" />
-              <button class="send-button" id="sendButton" aria-label="Send message">↑</button>
+              <input id="messageInput" type="text" autocomplete="off" placeholder="Type your message…" aria-label="Describe your complaint" />
+              <button class="send-button" id="sendButton" aria-label="Send message">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 19V5M12 5l-5 5M12 5l5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
             </div>
-            <div class="composer-foot"><span id="voiceHint">HTTPS required for mic on mobile</span><button class="voice-toggle" id="voiceToggle" type="button" aria-pressed="true">Voice replies on</button></div>
-            <input id="photoInput" type="file" accept="image/*" hidden />
+            <div class="composer-foot"><span id="voiceHint">HTTPS required for mic on mobile</span><button class="voice-toggle" id="voiceToggle" type="button" aria-pressed="true" title="Toggle spoken replies">🔊</button></div>
           </div>
         </div>
 
@@ -81,7 +81,6 @@
             <p id="trackingStatus">Draft created for this demo</p>
             <div class="tracking-line"><span class="tracking-dot active"></span><span>Complaint reviewed</span><span class="tracking-date">Today</span></div>
             <div class="tracking-line"><span class="tracking-dot"></span><span>Shared with relevant authority</span><span class="tracking-date">Not connected</span></div>
-            <button class="track-action" id="trackAction" type="button">Check mock status again</button>
             <small>For demonstration only — this number is not a government reference.</small>
           </div>
         </aside>

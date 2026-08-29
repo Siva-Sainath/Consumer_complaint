@@ -78,10 +78,25 @@ function addLocationSuggestion() {
   if (wrap.children.length) suggestions.append(wrap);
 }
 function addMessage(text, who='assistant') {
-  const wrap = document.createElement('div'); wrap.className = `message ${who}-message`;
-  const avatar = document.createElement('div'); avatar.className='avatar'; avatar.textContent = who === 'assistant' ? '✦' : 'you';
-  const body = document.createElement('div'); body.innerHTML = `<p>${escapeHtml(text)}</p><span class="message-time">just now</span>`;
-  wrap.append(avatar, body); conversation.append(wrap); conversation.scrollTop = conversation.scrollHeight;
+  const wrap = document.createElement('div');
+  wrap.className = `message ${who}-message`;
+  if (who === 'assistant') {
+    const avatar = document.createElement('div');
+    avatar.className = 'avatar assistant-avatar';
+    avatar.setAttribute('aria-hidden', 'true');
+    avatar.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8L12 3z" fill="currentColor"/></svg>';
+    const body = document.createElement('div');
+    body.className = 'bubble';
+    body.innerHTML = `<p>${escapeHtml(text)}</p>`;
+    wrap.append(avatar, body);
+  } else {
+    const body = document.createElement('div');
+    body.className = 'bubble';
+    body.innerHTML = `<p>${escapeHtml(text)}</p>`;
+    wrap.append(body);
+  }
+  conversation.append(wrap);
+  conversation.scrollTop = conversation.scrollHeight;
 }
 
 async function speakNative(text) {
@@ -125,7 +140,7 @@ async function speak(text) {
 }
 async function callGroq(text) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 3500);
+  const timeout = setTimeout(() => controller.abort(), 8000);
   try {
     const response = await fetch('/api/complaint-turn', {
       method: 'POST', headers: {'Content-Type':'application/json'},
@@ -136,20 +151,42 @@ async function callGroq(text) {
   } catch { return null; } finally { clearTimeout(timeout); }
 }
 
+function mergeFields(partial) {
+  for (const [key, value] of Object.entries(partial || {})) {
+    const next = typeof value === 'string' ? value.trim() : value;
+    if (next) state.fields[key] = next;
+  }
+}
+function missingField() {
+  if (!state.fields.what) return 'what';
+  if (!state.fields.who) return 'who';
+  if (!state.fields.when) return 'when';
+  if (!state.fields.relief) return 'relief';
+  return null;
+}
 function inferComplaint(text) {
   const t = text.toLowerCase();
   const next = {};
-  if (/amazon|flipkart|myntra|swiggy|zomato|blinkit|seller|shop|store|company|bank|jio|airtel|service provider|restaurant|biryani|cafe|hotel/.test(t)) {
+  if (/amazon|flipkart|myntra|swiggy|zomato|blinkit|seller|shop|store|company|bank|jio|airtel|service provider|restaurant|biryani|cafe|hotel|khrithunga|paradise/.test(t)) {
     const named = text.match(/\b(?:provider|seller|restaurant|shop|store|company|from|at)\s+(?:was\s+)?([^,.!?]+)/i);
-    next.who = named?.[1]?.trim() || text.match(/amazon|flipkart|myntra|swiggy|zomato|blinkit|jio|airtel|bank|paradise[^,.!?]*/i)?.[0] || 'Seller / service provider';
+    next.who = named?.[1]?.trim() || text.match(/amazon|flipkart|myntra|swiggy|zomato|blinkit|jio|airtel|bank|paradise|khrithunga[^,.!?]*/i)?.[0] || '';
   }
-  if (/refund|money back|paise|₹|rs\.?\s?\d|rupees|charged|price|mrp|payment|amount/.test(t)) next.relief = /refund|money back|paise|charged|payment|amount|₹|rs\.?/i.test(t) ? 'Refund / money back' : '';
-  if (/food|restaurant|expired|rotten|stale|packaged|fssai/.test(t)) next.route = 'FSSAI · food safety complaint';
+  if (/apolog|sorry|corrective|food safety|fssai|authority action/.test(t)) next.relief = /food safety|fssai|authority/.test(t) ? 'Food safety authority action' : 'Apology and corrective action';
+  else if (/refund|money back|paise|₹|rs\.?\s?\d|rupees|charged|price|mrp|payment|amount/.test(t)) next.relief = 'Refund / money back';
+  else if (/replacement|replace/.test(t)) next.relief = 'Replacement';
+  if (/food|restaurant|expired|rotten|stale|packaged|fssai|biryani/.test(t)) next.route = 'FSSAI · food safety complaint';
   else if (/mrp|overcharg|price tag|weigh|weight|meter/.test(t)) next.route = 'Legal Metrology · overcharging / MRP';
   else if (/scam|fraud|upi|cyber|otp|online/.test(t)) next.route = 'Cyber Crime · online fraud';
-  else if (Object.keys(state.fields).length || next.who) next.route = 'National Consumer Helpline · consumer grievance';
-  next.what = text.length > 18 ? text.slice(0, 110) + (text.length > 110 ? '…' : '') : '';
-  next.when = /yesterday|today|last week|on \d|january|february|march|april|may|june|july|august|september|october|november|december/i.test(t) ? 'Date mentioned in your story' : '';
+  else if (next.who || state.fields.who) next.route = 'National Consumer Helpline · consumer grievance';
+  if (text.length > 18) next.what = text.slice(0, 110) + (text.length > 110 ? '…' : '');
+  const hasWhen = /yesterday|today|last week|\d+\s*days?\s*ago|two days|ago|january|february|march|april|may|june|july|august|september|october|november|december|\d{1,2}(?:st|nd|rd|th)?\s+\w+/i.test(t);
+  const hasWhere = /\b(hyderabad|mumbai|delhi|bangalore|chennai|kolkata|pune|ahmedabad|kphb|colony|near|got it in|in [A-Z])/i.test(text);
+  if (hasWhen || hasWhere) {
+    const date = text.match(/(?:\d{1,2}(?:st|nd|rd|th)?\s+\w+|\d+\s*days?\s*ago|two days ago|yesterday|today)/i)?.[0];
+    const place = text.match(/(?:in|at|near)\s+([^,.!?]{3,80})/i)?.[1]?.trim();
+    const parts = [date, place].filter(Boolean);
+    next.when = parts.length ? parts.join(' · ') : 'Date and place mentioned';
+  }
   return next;
 }
 
@@ -180,22 +217,27 @@ function showSuggestions() {
     const restart=document.createElement('button'); restart.className='suggestion'; restart.textContent='Start a consumer complaint instead'; restart.onclick=resetDemo; suggestions.append(restart);
     return;
   }
-  if (!state.fields.relief) addSuggestion('What would make this right?', ['Refund','Replacement','Just an apology']);
-  if (!state.fields.photo) addSuggestion('Add a receipt or product photo', [], true);
-  if (Object.keys(state.fields).filter(k=>['what','who','when','relief'].includes(k)).length >= 3 && !state.submitted) addSuggestion('Review your complaint', [], false, true);
+  const missing = missingField();
+  if (missing === 'relief') addSuggestion('', ['Refund','Replacement','Apology']);
+  if (!state.submitted && !missing) addSuggestion('Review your complaint', [], false, true);
+  else if (!state.submitted && missing === 'when') addSuggestion('', ['Yesterday','Last week']);
 }
 function addSuggestion(label, options=[], photo=false, review=false) {
   if (options.length) options.forEach(option => { const b=document.createElement('button'); b.className='suggestion'; b.textContent=option; b.onclick=()=>{ input.value=option; send(); }; suggestions.append(b); });
-  else { const b=document.createElement('button'); b.className=`suggestion ${photo?'photo':''}`; b.textContent=label; b.onclick=()=> review ? openReview() : photo ? $('photoInput').click() : null; suggestions.append(b); }
+  else if (review) { const b=document.createElement('button'); b.className='suggestion review-chip'; b.textContent=label; b.onclick=openReview; suggestions.append(b); }
 }
 
 function respond(text) {
-  const lower=text.toLowerCase(); let reply='Got it. I’m keeping the important details together.';
+  let reply;
+  const missing = missingField();
   if (state.outOfScope) reply=`I understand. This is ${state.outOfScope}, so the consumer grievance route isn’t the right avenue. ${scopeGuidance[state.outOfScope]} I can still help with a product or service issue.`;
-  else if (!state.fields.who) reply='That sounds really frustrating. Who was the seller or service provider involved? Even an approximate name is okay.';
-  else if (!state.fields.when) reply='I’ve got the issue. When and where did you buy or use the service? A rough date and city is enough for now.';
-  else if (!state.fields.relief) reply='You’ve explained what went wrong. What would feel like a fair resolution — a refund, replacement, or something else?';
-  else reply='This is taking shape. I’ve suggested a likely route and added a review step so you can check everything before it is “submitted”.';
+  else if (!missing) {
+    const route = state.fields.route || 'the right channel';
+    reply=`Thank you — I’ve captured what matters. This looks like a ${route} matter. When you’re ready, tap Review your complaint to check everything before we create a mock docket.`;
+  } else if (missing === 'who') reply='That sounds really frustrating. Who was the seller or service provider? Even an approximate name is fine.';
+  else if (missing === 'when') reply='Got it. When and where did this happen? A rough date and city or area is enough.';
+  else if (missing === 'relief') reply='Understood. What would feel fair — a refund, replacement, apology, or something else?';
+  else reply='I’m keeping track of the details. Tell me a bit more in your own words.';
   addMessage(reply);
   speak(reply);
 }
@@ -205,13 +247,13 @@ function send() {
   addMessage(text,'user'); input.value=''; state.messages++;
   const scope = detectOutOfScope(text);
   if (scope) { state.outOfScope=scope; state.fields.route='Outside consumer grievance scope'; }
-  else if (!state.outOfScope) Object.assign(state.fields, inferComplaint(text));
+  else if (!state.outOfScope) mergeFields(inferComplaint(text));
   persist(); renderState(); setVoicePhase('THINKING'); respond(text); showSuggestions();
   const place = locationPhrase(text);
   if (place && !state.location?.approved) { state.location={query:place, loading:false, result:null, approved:false}; persist(); showSuggestions(); }
   callGroq(text).then((result) => {
     if (!result?.extracted_fields) { if (state.voicePhase==='THINKING') setVoicePhase('IDLE'); return; }
-    Object.assign(state.fields, result.extracted_fields);
+    mergeFields(result.extracted_fields);
     if (result.routing && !state.outOfScope) state.fields.route = result.routing;
     state.aiMode = 'Groq enhanced';
     persist(); renderState(); showSuggestions();
@@ -221,7 +263,7 @@ function send() {
 function openReview() {
   if(state.submitted) return;
   const summary = Object.entries({Issue:state.fields.what, Seller:state.fields.who, 'When & where':state.fields.when, 'You want':state.fields.relief}).filter(([,v])=>v).map(([k,v])=>`<div><small>${k.toUpperCase()}</small><p>${escapeHtml(v)}</p></div>`).join('');
-  const wrap=document.createElement('div'); wrap.className='message assistant-message'; wrap.innerHTML=`<div class="avatar">✦</div><div><p>Here’s what I heard. Check it once, then I’ll create a mock complaint number.</p><div class="review-card">${summary}<div class="review-route">↗ ${escapeHtml(state.fields.route || 'National Consumer Helpline')}</div><button id="confirmButton" class="confirm-button">Looks right · continue</button></div><span class="message-time">just now</span></div>`; conversation.append(wrap); conversation.scrollTop=conversation.scrollHeight; suggestions.innerHTML=''; $('confirmButton').onclick=openVerification;
+  const wrap=document.createElement('div'); wrap.className='message assistant-message'; wrap.innerHTML=`<div class="avatar assistant-avatar" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8L12 3z" fill="currentColor"/></svg></div><div class="bubble"><p>Here’s what I heard. Check it once, then I’ll create a mock complaint number.</p><div class="review-card">${summary}<div class="review-route">↗ ${escapeHtml(state.fields.route || 'National Consumer Helpline')}</div><button id="confirmButton" class="confirm-button">Looks right · continue</button></div></div>`; conversation.append(wrap); conversation.scrollTop=conversation.scrollHeight; suggestions.innerHTML=''; $('confirmButton').onclick=openVerification;
 }
 function openVerification() {
   if (state.submitted) return;
@@ -237,7 +279,7 @@ function submit() {
 }
 function resetDemo() { startNewChat(); }
 
-const WELCOME_HTML = `<div class="date-stamp">TODAY · STARTING FRESH</div><div class="message assistant-message"><div class="avatar">✦</div><div><p>Hi. I’m here to help you get this off your chest — and into the right hands.</p><p>What happened? Say it in your own words. <strong>Don’t worry about categories or formal language.</strong></p><span class="message-time">just now</span></div></div>`;
+const WELCOME_HTML = `<div class="date-stamp">Today</div><div class="message assistant-message"><div class="avatar assistant-avatar" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8L12 3z" fill="currentColor"/></svg></div><div class="bubble"><p>Hi. Tell me what happened in your own words — no formal language needed.</p><p><strong>I’ll only ask about what’s still missing.</strong></p></div></div>`;
 const FIELD_DEFAULTS = {what:'Waiting for your story', who:'Seller or service provider', when:'Date and location', relief:'Refund, replacement or other relief'};
 
 function startNewChat() {
@@ -268,8 +310,7 @@ function startNewChat() {
   window.scrollTo({top: document.querySelector('.workspace')?.offsetTop || 0, behavior:'smooth'});
 }
 
-$('sendButton').onclick=send; input.addEventListener('keydown',e=>{if(e.key==='Enter')send()}); $('photoButton').onclick=()=>$('photoInput').click();
-$('photoInput').onchange=(e)=>{if(e.target.files[0]){state.fields.photo=e.target.files[0].name; persist(); addMessage(`I’ve attached ${e.target.files[0].name}.`, 'user'); addMessage('Photo saved for review. In this demo, image understanding is mocked; I’ll still ask for anything it cannot confirm.'); showSuggestions();}};
+$('sendButton').onclick=send; input.addEventListener('keydown',e=>{if(e.key==='Enter')send()});
 const voiceSession = { stream:null, recorder:null, chunks:[], maxTimer:null, startedAt:0 };
 
 function pickAudioMimeType() {
@@ -417,13 +458,12 @@ $('micButton').onclick = () => {
 };
 $('helpButton').onclick=()=>{$('modalBackdrop').hidden=false}; $('modalClose').onclick=()=>{$('modalBackdrop').hidden=true}; $('modalBackdrop').onclick=e=>{if(e.target===$('modalBackdrop'))$('modalBackdrop').hidden=true};
 $('newChatButton').onclick=startNewChat;
-$('trackAction').onclick=()=>{ $('trackingStatus').textContent='Checked just now · mock status unchanged'; };
 state.speaking = saved?.speaking ?? true;
-$('voiceToggle').textContent = state.speaking ? 'Voice replies on' : 'Voice replies off';
+$('voiceToggle').textContent = state.speaking ? '🔊' : '🔇';
 $('voiceToggle').setAttribute('aria-pressed', String(state.speaking));
 setVoicePhase(state.voicePhase || 'IDLE');
 setListeningUi(false);
-$('voiceToggle').onclick=()=>{state.speaking=!state.speaking; $('voiceToggle').textContent=state.speaking?'Voice replies on':'Voice replies off'; $('voiceToggle').setAttribute('aria-pressed', String(state.speaking)); if(!state.speaking){window.speechSynthesis?.cancel(); state.audio?.pause();} persist();};
+$('voiceToggle').onclick=()=>{state.speaking=!state.speaking; $('voiceToggle').textContent=state.speaking?'🔊':'🔇'; $('voiceToggle').setAttribute('aria-pressed', String(state.speaking)); $('voiceToggle').title=state.speaking?'Voice replies on':'Voice replies off'; if(!state.speaking){window.speechSynthesis?.cancel(); state.audio?.pause();} persist();};
 $('verificationClose').onclick=()=>{$('verificationBackdrop').hidden=true};
 $('verificationBackdrop').onclick=(event)=>{if(event.target===$('verificationBackdrop'))$('verificationBackdrop').hidden=true};
 $('skipVerification').onclick=()=>{$('verificationBackdrop').hidden=true; submit();};
