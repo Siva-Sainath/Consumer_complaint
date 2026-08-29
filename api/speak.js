@@ -23,6 +23,7 @@ export default async function handler(req, res) {
           signal: controller.signal
         });
         if (!upstream.ok) errorDetail = await upstream.text();
+        if (upstream.status === 400 || upstream.status === 401 || upstream.status === 403 || upstream.status === 429) break;
         if (upstream.ok) break;
       } finally {
         clearTimeout(timeout);

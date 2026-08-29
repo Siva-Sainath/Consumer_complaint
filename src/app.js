@@ -118,8 +118,8 @@ function speakNative(text, attempt = 0) {
   }
   if (!state.nativeVoice || !voices.includes(state.nativeVoice)) {
     state.nativeVoice = voices.find((item) => hindi && item.lang.toLowerCase().startsWith('hi')) ||
-      voices.find((item) => item.lang.toLowerCase().startsWith('en-in')) ||
       voices.find((item) => /samantha|ava|karen|google uk english female/i.test(item.name)) ||
+      voices.find((item) => item.lang.toLowerCase().startsWith('en-in')) ||
       voices.find((item) => item.lang.toLowerCase().startsWith('en')) || voices[0];
   }
   const preferred = state.nativeVoice;
