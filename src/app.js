@@ -559,11 +559,19 @@ $('micButton').onclick = () => {
 $('helpButton').onclick=()=>{$('modalBackdrop').hidden=false}; $('modalClose').onclick=()=>{$('modalBackdrop').hidden=true}; $('modalBackdrop').onclick=e=>{if(e.target===$('modalBackdrop'))$('modalBackdrop').hidden=true};
 $('newChatButton').onclick=startNewChat;
 state.speaking = true;
-$('voiceToggle').textContent = state.speaking ? '🔊' : '🔇';
+function updateVoiceToggle() {
+  const icon = state.speaking
+    ? '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 10v4h4l5 4V6l-5 4H4Z" fill="currentColor"/><path d="M17 9.5a4 4 0 0 1 0 5M19.5 7a7.5 7.5 0 0 1 0 10" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>'
+    : '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 10v4h4l5 4V6l-5 4H4Z" fill="currentColor"/><path d="m17 9 4 6m0-6-4 6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
+  $('voiceToggle').innerHTML = icon;
+  $('voiceToggle').setAttribute('aria-label', state.speaking ? 'Turn voice replies off' : 'Turn voice replies on');
+  $('voiceToggle').title = state.speaking ? 'Turn voice replies off' : 'Turn voice replies on';
+}
+updateVoiceToggle();
 $('voiceToggle').setAttribute('aria-pressed', String(state.speaking));
 setVoicePhase(state.voicePhase || 'IDLE');
 setListeningUi(false);
-$('voiceToggle').onclick=()=>{state.speaking=!state.speaking; $('voiceToggle').textContent=state.speaking?'🔊':'🔇'; $('voiceToggle').setAttribute('aria-pressed', String(state.speaking)); $('voiceToggle').title=state.speaking?'Voice replies on':'Voice replies off'; if(!state.speaking){window.speechSynthesis?.cancel(); state.audio?.pause();} persist();};
+$('voiceToggle').onclick=()=>{state.speaking=!state.speaking; updateVoiceToggle(); $('voiceToggle').setAttribute('aria-pressed', String(state.speaking)); if(!state.speaking){window.speechSynthesis?.cancel(); state.audio?.pause();} persist();};
 $('verificationClose').onclick=()=>{$('verificationBackdrop').hidden=true};
 $('verificationBackdrop').onclick=(event)=>{if(event.target===$('verificationBackdrop'))$('verificationBackdrop').hidden=true};
 $('trackIssuesButton').onclick=openTracking;
