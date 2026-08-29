@@ -71,13 +71,13 @@ function addLocationSuggestion() {
   if (!state.location?.query) return;
   const wrap = document.createElement('div'); wrap.className='location-suggestion';
   if (state.location.result && !state.location.approved) {
-    wrap.innerHTML=`<span class="location-pin">⌖</span><div><strong>${escapeHtml(state.location.result.display_name)}</strong><small>Is this the place you meant?</small></div>`;
+    wrap.innerHTML=`<span class="location-pin">⌖</span><div><strong>${escapeHtml(state.location.result.display_name)}</strong><small>Is this the place you meant? Map context only — no restaurant is contacted.</small></div>`;
     const approve = document.createElement('button'); approve.className='approve-location'; approve.textContent='Use this'; approve.onclick=()=>{state.location.approved=true; persist(); renderState(); showSuggestions(); addMessage(`I’ve tagged ${state.location.result.display_name} as the location.`, 'assistant');}; wrap.append(approve);
   } else if (!state.location.result && !state.location.loading) {
     const button=document.createElement('button'); button.className='suggestion photo'; button.textContent=`Find “${state.location.query}” on map`; button.onclick=async()=>{state.location.loading=true; showSuggestions(); const results=await findPlace(state.location.query); state.location.loading=false; state.location.result=results[0] || null; persist(); showSuggestions();}; wrap.append(button);
   }
   if (state.location.result && state.location.approved) {
-    wrap.innerHTML=`<span class="location-pin">✓</span><div><strong>${escapeHtml(state.location.result.display_name)}</strong><small>Location tag approved by you · © OpenStreetMap contributors</small></div>`;
+    wrap.innerHTML=`<span class="location-pin">✓</span><div><strong>${escapeHtml(state.location.result.display_name)}</strong><small>Location context approved · no restaurant is contacted · © OpenStreetMap contributors</small></div>`;
   }
   if (wrap.children.length) suggestions.append(wrap);
 }
