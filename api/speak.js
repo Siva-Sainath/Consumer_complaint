@@ -6,6 +6,7 @@ export default async function handler(req, res) {
   if (text.length > 200) return res.status(413).json({error:'Speech text is too long'});
   try {
     let upstream;
+    let errorDetail = '';
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 12000);
@@ -21,12 +22,16 @@ export default async function handler(req, res) {
           }),
           signal: controller.signal
         });
+        if (!upstream.ok) errorDetail = await upstream.text();
         if (upstream.ok) break;
       } finally {
         clearTimeout(timeout);
       }
     }
-    if (!upstream?.ok) return res.status(502).json({error:'Speech service is unavailable'});
+    if (!upstream?.ok) {
+      console.error('Groq speech error', errorDetail);
+      return res.status(502).json({error:'Speech service is unavailable', detail:errorDetail.slice(0, 300)});
+    }
     const audio=Buffer.from(await upstream.arrayBuffer());
     res.setHeader('Content-Type','audio/wav');
     res.setHeader('Cache-Control','no-store');
