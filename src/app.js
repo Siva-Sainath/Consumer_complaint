@@ -226,12 +226,13 @@ function inferComplaint(text) {
   else if (/scam|fraud|upi|cyber|otp|online/.test(t)) next.route = 'Cyber Crime · online fraud';
   else if (next.who || state.fields.who) next.route = 'National Consumer Helpline · consumer grievance';
   if (text.length > 18) next.what = text.slice(0, 110) + (text.length > 110 ? '…' : '');
-  const hasWhen = /yesterday|today|last week|\d+\s*days?\s*ago|two days|ago|january|february|march|april|may|june|july|august|september|october|november|december|\d{1,2}(?:st|nd|rd|th)?\s+\w+/i.test(t);
+  const hasWhen = /yesterday|today|last week|\d+\s*days?\s*ago|two days|ago|january|february|march|april|may|june|july|august|september|october|november|december|\d{1,2}(?:st|nd|rd|th)?\s+\w+|\b(?:[01]?\d|2[0-3])(?::[0-5]\d)?\s*(?:a\.?m\.?|p\.?m\.?)\b|\b(?:[01]\d|2[0-3]):[0-5]\d\b/i.test(t);
   const hasWhere = /\b(hyderabad|mumbai|delhi|bangalore|chennai|kolkata|pune|ahmedabad|kphb|colony|near|got it in|in [A-Z])/i.test(text);
   if (hasWhen || hasWhere) {
     const date = text.match(/(?:\d{1,2}(?:st|nd|rd|th)?\s+\w+|\d+\s*days?\s*ago|two days ago|yesterday|today)/i)?.[0];
+    const time = text.match(/\b(?:[01]?\d|2[0-3])(?::[0-5]\d)?\s*(?:a\.?m\.?|p\.?m\.?)\b|\b(?:[01]\d|2[0-3]):[0-5]\d\b/i)?.[0];
     const place = text.match(/(?:in|at|near)\s+([^,.!?]{3,80})/i)?.[1]?.trim();
-    const parts = [date, place].filter(Boolean);
+    const parts = [date, time, place].filter(Boolean);
     next.when = parts.length ? parts.join(' · ') : 'Date and place mentioned';
   }
   return next;
