@@ -140,10 +140,6 @@ async function speak(text) {
     return;
   }
   const plain = text.replace(/\[[^\]]+\]\s*/g, '');
-  if ('speechSynthesis' in window) {
-    speakNative(plain);
-    return;
-  }
   setVoicePhase('SPEAKING');
   if (!/[\u0900-\u097F]/.test(plain)) {
     try {
