@@ -31,8 +31,7 @@ export default async function handler(req, res) {
           generationConfig:{
             temperature:0.2,
             maxOutputTokens:1200,
-            responseMimeType:'application/json',
-            thinkingConfig:{thinkingBudget:0}
+            responseMimeType:'application/json'
           }
         }),
         signal:controller.signal
