@@ -2,7 +2,7 @@ import {createClient} from '@supabase/supabase-js';
 
 // A refresh intentionally starts a fresh demo session. Location search results
 // may be cached separately, but complaint content is never restored.
-const state = { fields:{}, attachments:[], messages:0, voicePhase:'IDLE', submitted:false, docket:'', location:null, speaking:true };
+const state = { fields:{}, attachments:[], messages:0, voicePhase:'IDLE', submitted:false, docket:'', location:null, speaking:true, nativeVoice:null };
 let storageClient;
 const DEVICE_KEY = 'consumer-copilot-demo-device';
 const deviceId = localStorage.getItem(DEVICE_KEY) || (() => {
@@ -112,10 +112,13 @@ async function speakNative(text) {
   const hindi = /[\u0900-\u097F]/.test(text);
   const voices = window.speechSynthesis.getVoices();
   if (!voices.length) { setTimeout(() => speak(text), 120); return; }
-  const preferred = voices.find((item) => hindi && item.lang.toLowerCase().startsWith('hi')) ||
-    voices.find((item) => item.lang.toLowerCase().startsWith('en-in')) ||
-    voices.find((item) => /samantha|ava|karen|google uk english female/i.test(item.name)) ||
-    voices.find((item) => item.lang.toLowerCase().startsWith('en')) || voices[0];
+  if (!state.nativeVoice || !voices.includes(state.nativeVoice)) {
+    state.nativeVoice = voices.find((item) => hindi && item.lang.toLowerCase().startsWith('hi')) ||
+      voices.find((item) => item.lang.toLowerCase().startsWith('en-in')) ||
+      voices.find((item) => /samantha|ava|karen|google uk english female/i.test(item.name)) ||
+      voices.find((item) => item.lang.toLowerCase().startsWith('en')) || voices[0];
+  }
+  const preferred = state.nativeVoice;
   const sentences = text.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [text];
   sentences.forEach((sentence, index) => {
     const utterance = new SpeechSynthesisUtterance(sentence.trim());
@@ -199,9 +202,11 @@ function modelAskedForCompletedDetail(reply) {
 function inferComplaint(text) {
   const t = text.toLowerCase();
   const next = {};
-  if (/amazon|flipkart|myntra|swiggy|zomato|blinkit|seller|shop|store|company|bank|jio|airtel|service provider|restaurant|biryani|cafe|hotel|khrithunga|paradise/.test(t)) {
-    const named = text.match(/\b(?:provider|seller|restaurant|shop|store|company|from|at)\s+(?:was\s+)?([^,.!?]+)/i);
-    next.who = named?.[1]?.trim() || text.match(/amazon|flipkart|myntra|swiggy|zomato|blinkit|jio|airtel|bank|paradise|khrithunga[^,.!?]*/i)?.[0] || '';
+  if (/amazon|flipkart|myntra|swiggy|zomato|blinkit|seller|shop|store|company|bank|jio|airtel|service provider|restaurant|biryani|cafe|hotel|mcdonald|burger king|kfc|domino|khrithunga|paradise/.test(t)) {
+    const named = text.match(/\b(?:provider|seller|restaurant|shop|store|company|from|at)\s+(?:was\s+)?(.+?)(?=\s+(?:in|at|near|on|yesterday|today|last|this)\b|[,.!?]|$)/i);
+    const known = text.match(/amazon|flipkart|myntra|swiggy|zomato|blinkit|mcdonald['’]?s?|burger king|kfc|domino['’]?s?|jio|airtel|bank|paradise|khrithunga/i)?.[0] || '';
+    const candidate = named?.[1]?.trim() || known;
+    if (candidate && !/^\d|^(?:the )?(?:food|meal|order|store|restaurant)$/i.test(candidate)) next.who = candidate;
   }
   if (/apolog|sorry|corrective|food safety|fssai|authority action/.test(t)) next.relief = /food safety|fssai|authority/.test(t) ? 'Food safety authority action' : 'Apology and corrective action';
   else if (/refund|money back|paise|₹|rs\.?\s?\d|rupees|charged|price|mrp|payment|amount/.test(t)) next.relief = 'Refund / money back';
