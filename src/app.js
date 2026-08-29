@@ -156,11 +156,11 @@ function splitSpeechText(text, maxLength = 180) {
   return chunks;
 }
 
-async function playGroqSpeech(text) {
+async function playHostedSpeech(endpoint, text) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 28000);
   try {
-    const response = await fetch('/api/speak', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({text}), signal: controller.signal});
+    const response = await fetch(endpoint, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({text}), signal: controller.signal});
     if (!response.ok || !response.headers.get('content-type')?.includes('audio')) return false;
     const url = URL.createObjectURL(await response.blob());
     const audio = new Audio(url);
@@ -193,12 +193,24 @@ async function speak(text) {
     const chunks = splitSpeechText(plain);
     let groqSucceeded = true;
     for (const chunk of chunks) {
-      if (!await playGroqSpeech(chunk)) {
+      if (!await playHostedSpeech('/api/speak', chunk)) {
         groqSucceeded = false;
         break;
       }
     }
     if (groqSucceeded) {
+      state.audio = null;
+      setVoicePhase('IDLE');
+      return;
+    }
+    let geminiSucceeded = true;
+    for (const chunk of chunks) {
+      if (!await playHostedSpeech('/api/gemini-speak', chunk)) {
+        geminiSucceeded = false;
+        break;
+      }
+    }
+    if (geminiSucceeded) {
       state.audio = null;
       setVoicePhase('IDLE');
       return;
