@@ -168,7 +168,9 @@ async function callGroq(text) {
 }
 
 function mergeFields(partial) {
+  const allowed = new Set(['what','category','product_or_service','who','when','location','amount_paid','order_reference','relief','evidence','route']);
   for (const [key, value] of Object.entries(partial || {})) {
+    if (!allowed.has(key)) continue;
     const next = typeof value === 'string' ? value.trim() : value;
     if (next) state.fields[key] = next;
   }
@@ -190,6 +192,16 @@ function inferComplaint(text) {
   if (/apolog|sorry|corrective|food safety|fssai|authority action/.test(t)) next.relief = /food safety|fssai|authority/.test(t) ? 'Food safety authority action' : 'Apology and corrective action';
   else if (/refund|money back|paise|₹|rs\.?\s?\d|rupees|charged|price|mrp|payment|amount/.test(t)) next.relief = 'Refund / money back';
   else if (/replacement|replace/.test(t)) next.relief = 'Replacement';
+  const amount = text.match(/(?:₹|rs\.?|inr)\s?[\d,]+|\b\d[\d,]*(?:\.\d+)?\s*(?:rupees|rs)\b/i);
+  if (amount) next.amount_paid = amount[0];
+  const order = text.match(/(?:order|invoice|transaction|reference)\s*(?:id|number|no\.?)?\s*[:#-]?\s*([A-Z0-9-]{5,})/i);
+  if (order) next.order_reference = order[1];
+  if (/receipt|invoice|screenshot|photo|proof|document/.test(t)) next.evidence = 'Supporting document mentioned';
+  if (/food|biryani|restaurant|meal|grocery|expired|rotten|stale/.test(t)) next.category = 'Food and dining';
+  else if (/phone|laptop|fridge|tv|appliance|warranty|defect/.test(t)) next.category = 'Consumer durables';
+  else if (/bank|upi|payment|card|loan|insurance/.test(t)) next.category = 'Banking and financial services';
+  else if (/delivery|online|order|ecommerce|e-commerce/.test(t)) next.category = 'E-commerce';
+  else if (/mobile|broadband|internet|sim|network/.test(t)) next.category = 'Telecom';
   if (/food|restaurant|expired|rotten|stale|packaged|fssai|biryani/.test(t)) next.route = 'FSSAI · food safety complaint';
   else if (/mrp|overcharg|price tag|weigh|weight|meter/.test(t)) next.route = 'Legal Metrology · overcharging / MRP';
   else if (/scam|fraud|upi|cyber|otp|online/.test(t)) next.route = 'Cyber Crime · online fraud';
@@ -207,7 +219,7 @@ function inferComplaint(text) {
 }
 
 function renderState() {
-  const labels = {what:'what',who:'who',when:'when',relief:'relief'};
+  const labels = {what:'what',who:'who',when:'when',relief:'relief',amount_paid:'amount',order_reference:'reference'};
   let filled = 0;
   Object.entries(labels).forEach(([key, field]) => {
     const el = document.querySelector(`[data-field="${field}"]`); const value = state.fields[key];
@@ -281,7 +293,7 @@ async function send() {
 }
 function openReview() {
   if(state.submitted) return;
-  const summary = Object.entries({Issue:state.fields.what, Seller:state.fields.who, 'When & where':state.fields.when, 'You want':state.fields.relief}).filter(([,v])=>v).map(([k,v])=>`<div><small>${k.toUpperCase()}</small><p>${escapeHtml(v)}</p></div>`).join('');
+  const summary = Object.entries({Issue:state.fields.what, Category:state.fields.category, Seller:state.fields.who, 'When & where':state.fields.when, 'Amount paid':state.fields.amount_paid, 'Order / reference':state.fields.order_reference, 'You want':state.fields.relief, Evidence:state.fields.evidence}).filter(([,v])=>v).map(([k,v])=>`<div><small>${k.toUpperCase()}</small><p>${escapeHtml(v)}</p></div>`).join('');
   const wrap=document.createElement('div'); wrap.className='message assistant-message'; wrap.innerHTML=`<div class="avatar assistant-avatar" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8L12 3z" fill="currentColor"/></svg></div><div class="bubble"><p>Here’s what I heard. Check it once, then I’ll create a mock complaint number.</p><div class="review-card">${summary}<div class="review-route">↗ ${escapeHtml(state.fields.route || 'National Consumer Helpline')}</div><button id="confirmButton" class="confirm-button">Looks right · continue</button></div></div>`; conversation.append(wrap); conversation.scrollTop=conversation.scrollHeight; suggestions.innerHTML=''; $('confirmButton').onclick=openVerification;
 }
 function openVerification() {
@@ -380,7 +392,7 @@ async function openTracking() {
 }
 
 const WELCOME_HTML = `<div class="date-stamp">Today</div><div class="message assistant-message"><div class="avatar assistant-avatar" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8L12 3z" fill="currentColor"/></svg></div><div class="bubble"><p>Hi. Tell me what happened in your own words — no formal language needed.</p><p><strong>I’ll only ask about what’s still missing.</strong></p></div></div>`;
-const FIELD_DEFAULTS = {what:'Waiting for your story', who:'Seller or service provider', when:'Date and location', relief:'Refund, replacement or other relief'};
+const FIELD_DEFAULTS = {what:'Waiting for your story', who:'Seller or service provider', when:'Date and location', amount:'Optional transaction amount', reference:'Order or transaction ID', relief:'Refund, replacement or other relief'};
 
 function startNewChat() {
   if (state.voicePhase === 'LISTENING') stopVoiceTurn();

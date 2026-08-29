@@ -27,9 +27,15 @@ function cleanIssue(input = {}) {
     })),
     details: {
       what: String(fields.what || '').slice(0, 500),
+      category: String(fields.category || '').slice(0, 120),
+      product_or_service: String(fields.product_or_service || '').slice(0, 180),
       who: String(fields.who || '').slice(0, 180),
       when: String(fields.when || '').slice(0, 180),
-      relief: String(fields.relief || '').slice(0, 180)
+      location: String(fields.location || '').slice(0, 180),
+      amount_paid: String(fields.amount_paid || '').slice(0, 80),
+      order_reference: String(fields.order_reference || '').slice(0, 100),
+      relief: String(fields.relief || '').slice(0, 180),
+      evidence: String(fields.evidence || '').slice(0, 180)
     }
   };
 }
