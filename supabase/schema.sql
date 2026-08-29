@@ -40,3 +40,15 @@ drop policy if exists "demo updates read" on public.issue_updates;
 create policy "demo updates read" on public.issue_updates for select to anon using (true);
 drop policy if exists "demo updates create" on public.issue_updates;
 create policy "demo updates create" on public.issue_updates for insert to anon with check (true);
+
+-- Demo-only private evidence storage. Files are uploaded directly from the
+-- browser with the publishable key; use authenticated ownership policies
+-- before accepting real personal documents.
+insert into storage.buckets (id, name, public)
+values ('complaint-evidence', 'complaint-evidence', false)
+on conflict (id) do update set public = false;
+
+drop policy if exists "demo evidence upload" on storage.objects;
+create policy "demo evidence upload"
+on storage.objects for insert to anon
+with check (bucket_id = 'complaint-evidence');

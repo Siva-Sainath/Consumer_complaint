@@ -8,3 +8,4 @@ dist
 *.md
 backend/
 .vercel
+supabase/.temp

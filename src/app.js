@@ -1,6 +1,9 @@
+import {createClient} from '@supabase/supabase-js';
+
 // A refresh intentionally starts a fresh demo session. Location search results
 // may be cached separately, but complaint content is never restored.
 const state = { fields:{}, attachments:[], messages:0, voicePhase:'IDLE', submitted:false, docket:'', location:null, speaking:true };
+let storageClient;
 const DEVICE_KEY = 'consumer-copilot-demo-device';
 const deviceId = localStorage.getItem(DEVICE_KEY) || (() => {
   const id = `device-${crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`}`;
@@ -297,6 +300,10 @@ async function send() {
 }
 function openReview() {
   if(state.submitted) return;
+  if (state.attachments.some((item) => item.uploading)) {
+    addMessage('I’m still uploading your evidence. Give me a moment, then tap Review again.');
+    return;
+  }
   const summary = Object.entries({Issue:state.fields.what, Category:state.fields.category, Seller:state.fields.who, 'When & where':state.fields.when, 'Amount paid':state.fields.amount_paid, 'Order / reference':state.fields.order_reference, 'You want':state.fields.relief, Evidence:state.fields.evidence}).filter(([,v])=>v).map(([k,v])=>`<div><small>${k.toUpperCase()}</small><p>${escapeHtml(v)}</p></div>`).join('');
   const wrap=document.createElement('div'); wrap.className='message assistant-message'; wrap.innerHTML=`<div class="avatar assistant-avatar" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8L12 3z" fill="currentColor"/></svg></div><div class="bubble"><p>Here’s what I heard. Check it once, then I’ll create a mock complaint number.</p><div class="review-card">${summary}<div class="review-route">↗ ${escapeHtml(state.fields.route || 'National Consumer Helpline')}</div><button id="confirmButton" class="confirm-button">Looks right · continue</button></div></div>`; conversation.append(wrap); conversation.scrollTop=conversation.scrollHeight; suggestions.innerHTML=''; $('confirmButton').onclick=openVerification;
 }
@@ -325,28 +332,63 @@ function validContacts(contacts) {
     ? /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(detail)
     : detail.replace(/\D/g, '').length >= 10);
 }
+async function getStorageClient() {
+  if (storageClient) return storageClient;
+  const response = await fetch('/api/config');
+  if (!response.ok) throw new Error('Evidence storage is not configured');
+  const config = await response.json();
+  storageClient = createClient(config.url, config.key);
+  return storageClient;
+}
+async function uploadEvidence(file, attachment) {
+  const client = await getStorageClient();
+  const safeName = file.name.replace(/[^a-z0-9._-]/gi, '-').slice(-100) || 'evidence';
+  const path = `${deviceId}/${crypto.randomUUID()}-${safeName}`;
+  const {error} = await client.storage.from('complaint-evidence').upload(path, file, {
+    contentType: file.type, upsert: false
+  });
+  if (error) throw error;
+  attachment.path = path;
+  attachment.uploading = false;
+}
 function renderAttachmentHint() {
   const hint = $('attachmentHint');
   if (!hint) return;
-  hint.textContent = state.attachments.length
-    ? `${state.attachments.length} evidence file${state.attachments.length === 1 ? '' : 's'} attached`
-    : 'Photos, videos, or receipts welcome';
+  const uploading = state.attachments.filter((item) => item.uploading).length;
+  hint.textContent = uploading
+    ? `Uploading ${uploading} evidence file${uploading === 1 ? '' : 's'}…`
+    : state.attachments.length
+      ? `${state.attachments.length} evidence file${state.attachments.length === 1 ? '' : 's'} attached`
+      : 'Photos, videos, or receipts welcome';
 }
-function handleAttachments(event) {
+async function handleAttachments(event) {
   const files = [...(event.target.files || [])];
-  const accepted = files.filter((file) => /^(image|video)\//.test(file.type) || file.type === 'application/pdf');
+  const accepted = files.filter((file) => (/^(image|video)\//.test(file.type) || file.type === 'application/pdf') && file.size <= 50 * 1024 * 1024);
   const available = Math.max(0, 3 - state.attachments.length);
   const selected = accepted.slice(0, available);
-  state.attachments.push(...selected.map((file) => ({
+  const pending = selected.map((file) => ({
     name: file.name.slice(0, 120),
     type: file.type,
-    size: file.size
-  })));
+    size: file.size, uploading: true
+  }));
+  state.attachments.push(...pending);
   if (accepted.length > available) addMessage('I can keep up to three evidence files for this complaint.', 'assistant');
   if (files.length && !accepted.length) addMessage('Please choose a photo, video, or PDF receipt.', 'assistant');
   if (selected.length) {
     state.fields.evidence = `${state.attachments.length} supporting file${state.attachments.length === 1 ? '' : 's'} attached`;
     addMessage(`I’ve noted ${selected.length} evidence file${selected.length === 1 ? '' : 's'} for review.`, 'assistant');
+    renderAttachmentHint();
+    await Promise.all(pending.map(async (attachment, index) => {
+      try {
+        await uploadEvidence(selected[index], attachment);
+      } catch {
+        attachment.uploading = false;
+        attachment.error = true;
+      }
+    }));
+    if (pending.some((attachment) => attachment.error)) {
+      addMessage('One or more files could not be uploaded. You can continue without them or try again.', 'assistant');
+    }
   }
   renderAttachmentHint();
   renderState();
@@ -356,7 +398,7 @@ async function createIssue(contacts = []) {
   const response = await fetch('/api/issues', {
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({device_id:deviceId, fields:state.fields, attachments:state.attachments, contact_preferences:contacts})
+    body:JSON.stringify({device_id:deviceId, fields:state.fields, attachments:state.attachments.filter((item) => item.path && !item.error), contact_preferences:contacts})
   });
   if (!response.ok) throw new Error('Issue could not be created');
   return response.json();
