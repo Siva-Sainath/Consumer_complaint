@@ -133,6 +133,49 @@ function speakNative(text, attempt = 0) {
     window.speechSynthesis.speak(utterance);
   });
 }
+function splitSpeechText(text, maxLength = 180) {
+  const sentences = text.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [text];
+  const chunks = [];
+  let current = '';
+  for (const sentence of sentences) {
+    const words = sentence.trim().split(/\s+/);
+    for (const word of words) {
+      const candidate = current ? `${current} ${word}` : word;
+      if (candidate.length > maxLength && current) {
+        chunks.push(current);
+        current = word;
+      } else {
+        current = candidate;
+      }
+    }
+  }
+  if (current) chunks.push(current);
+  return chunks;
+}
+
+async function playGroqSpeech(text) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 28000);
+  try {
+    const response = await fetch('/api/speak', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({text}), signal: controller.signal});
+    if (!response.ok || !response.headers.get('content-type')?.includes('audio')) return false;
+    const url = URL.createObjectURL(await response.blob());
+    const audio = new Audio(url);
+    state.audio = audio;
+    await new Promise((resolve, reject) => {
+      audio.onended = resolve;
+      audio.onerror = reject;
+      audio.play().catch(reject);
+    });
+    URL.revokeObjectURL(url);
+    return true;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function speak(text) {
   if (!text) return;
   if (!state.speaking) {
@@ -142,19 +185,21 @@ async function speak(text) {
   const plain = text.replace(/\[[^\]]+\]\s*/g, '');
   setVoicePhase('SPEAKING');
   if (!/[\u0900-\u097F]/.test(plain)) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 28000);
-    try {
-      const response = await fetch('/api/speak', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({text: plain}), signal: controller.signal});
-      if (response.ok && response.headers.get('content-type')?.includes('audio')) {
-        window.speechSynthesis?.cancel();
-        state.audio?.pause();
-        state.audio = new Audio(URL.createObjectURL(await response.blob()));
-        state.audio.onended = () => setVoicePhase('IDLE');
-        await state.audio.play();
-        return;
+    window.speechSynthesis?.cancel();
+    state.audio?.pause();
+    const chunks = splitSpeechText(plain);
+    let groqSucceeded = true;
+    for (const chunk of chunks) {
+      if (!await playGroqSpeech(chunk)) {
+        groqSucceeded = false;
+        break;
       }
-    } catch {} finally { clearTimeout(timeout); }
+    }
+    if (groqSucceeded) {
+      state.audio = null;
+      setVoicePhase('IDLE');
+      return;
+    }
   }
   speakNative(plain);
 }

@@ -1,8 +1,9 @@
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({error:'Method not allowed'});
-  if (!process.env.GROQ_API_KEY) return res.status(204).end();
+  if (!process.env.GROQ_API_KEY) return res.status(503).json({error:'Speech service is not configured'});
   const { text } = req.body || {};
-  if (!text || /[\u0900-\u097F]/.test(text)) return res.status(204).end();
+  if (!text || /[\u0900-\u097F]/.test(text)) return res.status(400).json({error:'English text is required'});
+  if (text.length > 200) return res.status(413).json({error:'Speech text is too long'});
   try {
     let upstream;
     for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -16,8 +17,7 @@ export default async function handler(req, res) {
             model:'canopylabs/orpheus-v1-english',
             voice:'troy',
             input:`[warm][reassuring] ${text}`,
-            response_format:'wav',
-            speed:0.98
+            response_format:'wav'
           }),
           signal: controller.signal
         });
@@ -26,10 +26,10 @@ export default async function handler(req, res) {
         clearTimeout(timeout);
       }
     }
-    if (!upstream.ok) return res.status(204).end();
+    if (!upstream?.ok) return res.status(502).json({error:'Speech service is unavailable'});
     const audio=Buffer.from(await upstream.arrayBuffer());
     res.setHeader('Content-Type','audio/wav');
     res.setHeader('Cache-Control','no-store');
     return res.status(200).send(audio);
-  } catch { return res.status(204).end(); }
+  } catch { return res.status(502).json({error:'Speech could not be generated'}); }
 }
