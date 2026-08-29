@@ -28,7 +28,12 @@ export default async function handler(req, res) {
         body:JSON.stringify({
           systemInstruction:{parts:[{text:SYSTEM_PROMPT}]},
           contents:[{role:'user', parts:[{text:`${prompt}\nRespond with valid JSON only.`}]}],
-          generationConfig:{temperature:0.2, maxOutputTokens:500, responseMimeType:'application/json'}
+          generationConfig:{
+            temperature:0.2,
+            maxOutputTokens:1200,
+            responseMimeType:'application/json',
+            thinkingConfig:{thinkingBudget:0}
+          }
         }),
         signal:controller.signal
       }
@@ -49,7 +54,7 @@ export default async function handler(req, res) {
       result = JSON.parse(jsonStart >= 0 && jsonEnd > jsonStart ? cleaned.slice(jsonStart, jsonEnd + 1) : cleaned);
     } catch {
       console.error('Gemini returned invalid JSON', content);
-      return res.status(502).json({error:'AI response was not valid JSON', detail:content.slice(0, 500)});
+      return res.status(502).json({error:'AI response was not valid JSON'});
     }
     const allowedFields = new Set(['what', 'category', 'product_or_service', 'who', 'when', 'location', 'amount_paid', 'order_reference', 'relief', 'evidence']);
     const extracted_fields = Object.fromEntries(
