@@ -186,15 +186,9 @@ function missingField() {
   if (!state.fields.relief) return 'relief';
   return null;
 }
-function deterministicReply(text = '') {
-  const missing = missingField();
+function safeGuardrailReply() {
   if (state.outOfScope) return `I understand. This is ${state.outOfScope}, so the consumer grievance route isn’t the right avenue. ${scopeGuidance[state.outOfScope]} I can still help with a product or service issue.`;
-  if (!state.fields.what && !state.fields.who && !state.fields.when) return 'I’m here to help with a product or service problem. Tell me what happened, and I’ll help capture the details calmly.';
-  if (!missing) return `Thank you — I’ve captured the complaint and the incident details. You can attach a receipt, bill, photo, or video if you have one, then tap Review your complaint.`;
-  if (missing === 'who') return 'That sounds really frustrating. Who was the seller or service provider? Even an approximate name is fine.';
-  if (missing === 'when') return 'Got it. When and where did this happen? A rough date and city or area is enough.';
-  if (missing === 'relief') return 'Understood. What would feel fair — a refund, replacement, apology, or something else?';
-  return 'I’m keeping track of the details. Tell me a bit more in your own words.';
+  return 'I captured your message, but the AI response service did not return a reliable answer. Please try that turn again.';
 }
 function modelAskedForCompletedDetail(reply) {
   const checks = [
@@ -282,11 +276,10 @@ function addSuggestion(label, options=[], photo=false, review=false) {
   else if (review) { const b=document.createElement('button'); b.className='suggestion review-chip'; b.textContent=label; b.onclick=openReview; suggestions.append(b); }
 }
 
-function respond(text, modelResult = null) {
+function respond(modelResult = null) {
   let reply;
-  const missing = missingField();
   const modelReply = String(modelResult?.spoken_response || '').trim();
-  reply = modelReply && !modelAskedForCompletedDetail(modelReply) ? modelReply : deterministicReply(text);
+  reply = modelReply && !modelAskedForCompletedDetail(modelReply) ? modelReply : safeGuardrailReply();
   addMessage(reply);
   speak(reply);
 }
@@ -306,10 +299,10 @@ async function send() {
     if (result.routing && !state.outOfScope) state.fields.route = result.routing;
     state.aiMode = 'Groq enhanced';
   } else {
-    state.aiMode = 'Local fallback';
+    state.aiMode = 'AI response unavailable';
   }
   persist(); renderState(); showSuggestions();
-  respond(text, result);
+  respond(result);
 }
 function openReview() {
   if(state.submitted) return;

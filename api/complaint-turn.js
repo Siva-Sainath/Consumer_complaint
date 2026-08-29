@@ -13,7 +13,7 @@ Use only these routing values: National Consumer Helpline, Legal Metrology, FSSA
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({error:'Method not allowed'});
-  if (!process.env.GROQ_API_KEY) return res.status(204).end();
+  if (!process.env.GROQ_API_KEY) return res.status(503).json({error:'AI response service is not configured'});
   const { text, current_fields = {} } = req.body || {};
   if (!text) return res.status(400).json({error:'Text is required'});
   const prompt = `Current extracted fields: ${JSON.stringify(current_fields)}\nCitizen message: ${text}`;
@@ -45,7 +45,7 @@ export default async function handler(req, res) {
       }
       if (upstream.ok) break;
     }
-    if (!upstream.ok) return res.status(204).end();
+    if (!upstream.ok) return res.status(502).json({error:'AI response service is unavailable'});
     const payload = await upstream.json();
     const content = payload.choices?.[0]?.message?.content || '';
     const result = JSON.parse(content.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim());
@@ -64,6 +64,6 @@ export default async function handler(req, res) {
       ui_suggestions: Array.isArray(result.ui_suggestions) ? result.ui_suggestions : []
     });
   } catch {
-    return res.status(204).end();
+    return res.status(502).json({error:'AI response could not be completed'});
   }
 }
