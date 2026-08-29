@@ -11,10 +11,10 @@ export default async function handler(req, res) {
       headers:{Authorization:`Bearer ${process.env.GROQ_API_KEY}`, 'Content-Type':'application/json'},
       body:JSON.stringify({
         model:'canopylabs/orpheus-v1-english',
-        voice:'hannah',
-        input:`[calm][gentle] ${text}`,
+        voice:'troy',
+        input:`[warm][reassuring] ${text}`,
         response_format:'wav',
-        speed:0.92
+        speed:0.98
       }),
       signal: controller.signal
     });
