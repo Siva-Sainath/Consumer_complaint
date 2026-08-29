@@ -143,7 +143,7 @@ async function speak(text) {
   setVoicePhase('SPEAKING');
   if (!/[\u0900-\u097F]/.test(plain)) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 14000);
+    const timeout = setTimeout(() => controller.abort(), 28000);
     try {
       const response = await fetch('/api/speak', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({text: plain}), signal: controller.signal});
       if (response.ok && response.headers.get('content-type')?.includes('audio')) {
