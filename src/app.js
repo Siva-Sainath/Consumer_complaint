@@ -106,12 +106,16 @@ function addMessage(text, who='assistant') {
   conversation.scrollTop = conversation.scrollHeight;
 }
 
-async function speakNative(text) {
+function speakNative(text, attempt = 0) {
   if (!state.speaking || !('speechSynthesis' in window) || !text) return;
   window.speechSynthesis.cancel();
   const hindi = /[\u0900-\u097F]/.test(text);
   const voices = window.speechSynthesis.getVoices();
-  if (!voices.length) { setTimeout(() => speak(text), 120); return; }
+  if (!voices.length) {
+    if (attempt < 5) setTimeout(() => speakNative(text, attempt + 1), 150);
+    else setVoicePhase('IDLE');
+    return;
+  }
   if (!state.nativeVoice || !voices.includes(state.nativeVoice)) {
     state.nativeVoice = voices.find((item) => hindi && item.lang.toLowerCase().startsWith('hi')) ||
       voices.find((item) => item.lang.toLowerCase().startsWith('en-in')) ||
@@ -136,6 +140,10 @@ async function speak(text) {
     return;
   }
   const plain = text.replace(/\[[^\]]+\]\s*/g, '');
+  if ('speechSynthesis' in window) {
+    speakNative(plain);
+    return;
+  }
   setVoicePhase('SPEAKING');
   if (!/[\u0900-\u097F]/.test(plain)) {
     try {
