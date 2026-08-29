@@ -41,7 +41,10 @@ export default async function handler(req, res) {
     }
     const payload = await upstream.json();
     const content = payload.candidates?.[0]?.content?.parts?.map((part) => part.text || '').join('') || '';
-    const result = JSON.parse(content.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim());
+    const cleaned = content.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+    const jsonStart = cleaned.indexOf('{');
+    const jsonEnd = cleaned.lastIndexOf('}');
+    const result = JSON.parse(jsonStart >= 0 && jsonEnd > jsonStart ? cleaned.slice(jsonStart, jsonEnd + 1) : cleaned);
     const allowedFields = new Set(['what', 'category', 'product_or_service', 'who', 'when', 'location', 'amount_paid', 'order_reference', 'relief', 'evidence']);
     const extracted_fields = Object.fromEntries(
       Object.entries(result.extracted_fields || {})
