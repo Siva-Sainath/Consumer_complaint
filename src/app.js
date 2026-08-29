@@ -1,6 +1,6 @@
-let saved = null;
-try { saved = JSON.parse(localStorage.getItem('consumer-copilot-demo') || 'null'); } catch { localStorage.removeItem('consumer-copilot-demo'); }
-const state = saved || { fields:{}, messages:0, voicePhase:'IDLE', submitted:false, docket:'', location:null };
+// A refresh intentionally starts a fresh demo session. Location search results
+// may be cached separately, but complaint content is never restored.
+const state = { fields:{}, messages:0, voicePhase:'IDLE', submitted:false, docket:'', location:null, speaking:true };
 const $ = (id) => document.getElementById(id);
 const conversation = $('conversation'), input = $('messageInput'), suggestions = $('suggestions');
 const VOICE_PHASES = new Set(['IDLE','LISTENING','TRANSCRIBING','THINKING','SPEAKING']);
@@ -27,9 +27,7 @@ const escapeHtml = (value = '') => String(value).replace(/[&<>"']/g, (char) => (
   '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#039;'
 }[char]));
 function persist() {
-  localStorage.setItem('consumer-copilot-demo', JSON.stringify({
-    fields: state.fields, messages: state.messages, submitted: state.submitted, docket: state.docket, location: state.location, speaking: state.speaking
-  }));
+  // Keep the live complaint in memory only so a hard refresh clears the chat.
 }
 function locationPhrase(text) {
   const match = text.match(/\b(?:at|near|in|from|में|पर|के पास)\s+([^,.!?]{3,70})/i);
@@ -458,7 +456,7 @@ $('micButton').onclick = () => {
 };
 $('helpButton').onclick=()=>{$('modalBackdrop').hidden=false}; $('modalClose').onclick=()=>{$('modalBackdrop').hidden=true}; $('modalBackdrop').onclick=e=>{if(e.target===$('modalBackdrop'))$('modalBackdrop').hidden=true};
 $('newChatButton').onclick=startNewChat;
-state.speaking = saved?.speaking ?? true;
+state.speaking = true;
 $('voiceToggle').textContent = state.speaking ? '🔊' : '🔇';
 $('voiceToggle').setAttribute('aria-pressed', String(state.speaking));
 setVoicePhase(state.voicePhase || 'IDLE');
@@ -478,4 +476,3 @@ renderState();
 showSuggestions();
 if ('speechSynthesis' in window) window.speechSynthesis.getVoices();
 fetch('/api/health').catch(() => {});
-if (state.submitted) addMessage(`This demo has a saved mock docket: ${state.docket}. Start another complaint below when ready.`);

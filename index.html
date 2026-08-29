@@ -49,7 +49,12 @@
           <div class="suggestions" id="suggestions"></div>
           <div class="composer-wrap">
             <div class="voice-stage" id="voiceStage">
-              <button class="mic-button voice-orb" id="micButton" aria-label="Speak your complaint"><span class="mic-icon">⌁</span></button>
+              <button class="mic-button voice-orb" id="micButton" aria-label="Start speaking">
+                <svg class="mic-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <rect x="8" y="3" width="8" height="12" rx="4" fill="currentColor"/>
+                  <path d="M5 11a7 7 0 0 0 14 0M12 18v3M8 21h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                </svg>
+              </button>
               <p class="voice-status" id="voicePrompt">Tap and speak</p>
               <p class="voice-substatus" id="voiceSubcopy">I’ll listen until you tap again</p>
             </div>
