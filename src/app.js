@@ -118,7 +118,11 @@ async function speakNative(text) {
   });
 }
 async function speak(text) {
-  if (!state.speaking || !text) return;
+  if (!text) return;
+  if (!state.speaking) {
+    setVoicePhase('IDLE');
+    return;
+  }
   const plain = text.replace(/\[[^\]]+\]\s*/g, '');
   setVoicePhase('SPEAKING');
   if (!/[\u0900-\u097F]/.test(plain)) {
@@ -138,7 +142,7 @@ async function speak(text) {
 }
 async function callGroq(text) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
+  const timeout = setTimeout(() => controller.abort(), 20000);
   try {
     const response = await fetch('/api/complaint-turn', {
       method: 'POST', headers: {'Content-Type':'application/json'},
@@ -225,10 +229,11 @@ function addSuggestion(label, options=[], photo=false, review=false) {
   else if (review) { const b=document.createElement('button'); b.className='suggestion review-chip'; b.textContent=label; b.onclick=openReview; suggestions.append(b); }
 }
 
-function respond(text) {
+function respond(text, modelResult = null) {
   let reply;
   const missing = missingField();
-  if (state.outOfScope) reply=`I understand. This is ${state.outOfScope}, so the consumer grievance route isn’t the right avenue. ${scopeGuidance[state.outOfScope]} I can still help with a product or service issue.`;
+  if (modelResult?.spoken_response) reply = String(modelResult.spoken_response).trim();
+  else if (state.outOfScope) reply=`I understand. This is ${state.outOfScope}, so the consumer grievance route isn’t the right avenue. ${scopeGuidance[state.outOfScope]} I can still help with a product or service issue.`;
   else if (!missing) {
     const route = state.fields.route || 'the right channel';
     reply=`Thank you — I’ve captured what matters. This looks like a ${route} matter. When you’re ready, tap Review your complaint to check everything before we create a mock docket.`;
@@ -239,24 +244,26 @@ function respond(text) {
   addMessage(reply);
   speak(reply);
 }
-function send() {
+async function send() {
   const text=input.value.trim();
   if(!text || state.submitted || voiceBusy()) return;
   addMessage(text,'user'); input.value=''; state.messages++;
   const scope = detectOutOfScope(text);
   if (scope) { state.outOfScope=scope; state.fields.route='Outside consumer grievance scope'; }
   else if (!state.outOfScope) mergeFields(inferComplaint(text));
-  persist(); renderState(); setVoicePhase('THINKING'); respond(text); showSuggestions();
+  persist(); renderState(); setVoicePhase('THINKING'); showSuggestions();
   const place = locationPhrase(text);
   if (place && !state.location?.approved) { state.location={query:place, loading:false, result:null, approved:false}; persist(); showSuggestions(); }
-  callGroq(text).then((result) => {
-    if (!result?.extracted_fields) { if (state.voicePhase==='THINKING') setVoicePhase('IDLE'); return; }
+  const result = await callGroq(text);
+  if (result?.extracted_fields) {
     mergeFields(result.extracted_fields);
     if (result.routing && !state.outOfScope) state.fields.route = result.routing;
     state.aiMode = 'Groq enhanced';
-    persist(); renderState(); showSuggestions();
-    if (state.voicePhase==='THINKING') setVoicePhase('IDLE');
-  });
+  } else {
+    state.aiMode = 'Local fallback';
+  }
+  persist(); renderState(); showSuggestions();
+  respond(text, result);
 }
 function openReview() {
   if(state.submitted) return;
