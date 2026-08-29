@@ -4,6 +4,8 @@ export default async function handler(req, res) {
   const { text } = req.body || {};
   if (!text || /[\u0900-\u097F]/.test(text)) return res.status(204).end();
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12000);
     const upstream = await fetch('https://api.groq.com/openai/v1/audio/speech', {
       method:'POST',
       headers:{Authorization:`Bearer ${process.env.GROQ_API_KEY}`, 'Content-Type':'application/json'},
@@ -13,8 +15,10 @@ export default async function handler(req, res) {
         input:`[calm][gentle] ${text}`,
         response_format:'wav',
         speed:0.92
-      })
+      }),
+      signal: controller.signal
     });
+    clearTimeout(timeout);
     if (!upstream.ok) return res.status(204).end();
     const audio=Buffer.from(await upstream.arrayBuffer());
     res.setHeader('Content-Type','audio/wav');

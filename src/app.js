@@ -142,8 +142,10 @@ async function speak(text) {
   const plain = text.replace(/\[[^\]]+\]\s*/g, '');
   setVoicePhase('SPEAKING');
   if (!/[\u0900-\u097F]/.test(plain)) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 14000);
     try {
-      const response = await fetch('/api/speak', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({text: plain})});
+      const response = await fetch('/api/speak', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({text: plain}), signal: controller.signal});
       if (response.ok && response.headers.get('content-type')?.includes('audio')) {
         window.speechSynthesis?.cancel();
         state.audio?.pause();
@@ -152,7 +154,7 @@ async function speak(text) {
         await state.audio.play();
         return;
       }
-    } catch {}
+    } catch {} finally { clearTimeout(timeout); }
   }
   speakNative(plain);
 }
