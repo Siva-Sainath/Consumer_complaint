@@ -1,6 +1,13 @@
 // A refresh intentionally starts a fresh demo session. Location search results
 // may be cached separately, but complaint content is never restored.
 const state = { fields:{}, messages:0, voicePhase:'IDLE', submitted:false, docket:'', location:null, speaking:true };
+const DEVICE_KEY = 'consumer-copilot-demo-device';
+const ISSUE_KEY = 'consumer-copilot-demo-issues';
+const deviceId = localStorage.getItem(DEVICE_KEY) || (() => {
+  const id = `device-${crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`}`;
+  localStorage.setItem(DEVICE_KEY, id);
+  return id;
+})();
 const $ = (id) => document.getElementById(id);
 const conversation = $('conversation'), input = $('messageInput'), suggestions = $('suggestions');
 const VOICE_PHASES = new Set(['IDLE','LISTENING','TRANSCRIBING','THINKING','SPEAKING']);
@@ -28,6 +35,13 @@ const escapeHtml = (value = '') => String(value).replace(/[&<>"']/g, (char) => (
 }[char]));
 function persist() {
   // Keep the live complaint in memory only so a hard refresh clears the chat.
+}
+function localIssues() {
+  try { return JSON.parse(localStorage.getItem(ISSUE_KEY) || '[]'); } catch { return []; }
+}
+function saveLocalIssue(issue) {
+  const issues = [issue, ...localIssues().filter((item) => item.id !== issue.id)].slice(0, 20);
+  localStorage.setItem(ISSUE_KEY, JSON.stringify(issues));
 }
 function locationPhrase(text) {
   const match = text.match(/\b(?:at|near|in|from|में|पर|के पास)\s+([^,.!?]{3,70})/i);
@@ -272,17 +286,98 @@ function openReview() {
 }
 function openVerification() {
   if (state.submitted) return;
+  renderContactFields();
   $('verificationBackdrop').hidden=false;
   $('demoMobile').focus();
 }
-function submit() {
+function renderContactFields() {
+  const selected = [...document.querySelectorAll('input[name="contactChannel"]:checked')].map((input) => input.value);
+  $('contactFields').innerHTML = selected.map((channel) => {
+    const labels = {whatsapp:'WhatsApp number', email:'Email address', sms:'Phone number'};
+    const types = {whatsapp:'tel', email:'email', sms:'tel'};
+    const values = {whatsapp:'9999900000', email:'demo@example.com', sms:'9999900000'};
+    return `<label for="contact-${channel}">${labels[channel]}</label><input id="contact-${channel}" class="verification-input contact-input" data-channel="${channel}" type="${types[channel]}" value="${values[channel]}" autocomplete="off" />`;
+  }).join('');
+}
+function selectedContacts() {
+  return [...document.querySelectorAll('.contact-input')].map((input) => ({
+    channel: input.dataset.channel, detail: input.value.trim()
+  })).filter((item) => item.detail);
+}
+function validContacts(contacts) {
+  return contacts.every(({channel, detail}) => channel === 'email'
+    ? /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(detail)
+    : detail.replace(/\D/g, '').length >= 10);
+}
+async function createIssue(contacts = []) {
+  const response = await fetch('/api/issues', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({device_id:deviceId, fields:state.fields, contact_preferences:contacts})
+  });
+  if (!response.ok) throw new Error('Issue could not be created');
+  return response.json();
+}
+async function submit() {
   if (state.submitted) return;
-  state.submitted=true; state.docket=`NCH-DEMO-26-${Math.floor(1000 + Math.random() * 9000)}`; persist();
+  const contacts = selectedContacts();
+  if (contacts.length && !validContacts(contacts)) {
+    $('verificationTitle').textContent='Please check the contact details';
+    return;
+  }
+  const submitButton = $('verifyButton');
+  submitButton.disabled = true;
+  submitButton.textContent = 'Creating your issue…';
+  let result;
+  try { result = await createIssue(contacts); } catch { result = {issue: createLocalIssue(contacts), source:'local-fallback'}; }
+  const issue = result.issue;
+  saveLocalIssue(issue);
+  state.submitted=true; state.docket=issue.reference_id; persist();
+  $('verificationBackdrop').hidden=true;
   addMessage('Done. Your mock complaint is logged. Keep this number if you want to follow up in this demo.'); speak('Done. Your mock complaint is logged.');
   addMessage(`Mock docket: ${state.docket}. Likely route: ${state.fields.route || 'National Consumer Helpline'}`);
   suggestions.innerHTML=''; const restart=document.createElement('button'); restart.className='suggestion'; restart.textContent='Start another complaint'; restart.onclick=resetDemo; suggestions.append(restart); renderState();
+  submitButton.disabled = false;
+  submitButton.textContent = 'Create mock issue';
+}
+function createLocalIssue(contacts) {
+  const now = new Date().toISOString();
+  return {id:`local-${Date.now()}`, reference_id:`NCH-DEMO-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`, title:state.fields.what || 'Consumer complaint', category:state.fields.route || 'National Consumer Helpline', status:'submitted', details:{...state.fields}, contact_preferences:contacts, submitted_at:now, updated_at:now, recent_update:'Complaint submitted for review.', updates:[{status:'submitted', message:'Complaint submitted for review.', created_at:now}]};
 }
 function resetDemo() { startNewChat(); }
+const statusLabels = {
+  submitted:'Submitted', under_review:'Under review', awaiting_user_response:'Awaiting your response',
+  escalated:'Escalated', resolved:'Resolved', closed:'Closed'
+};
+function formatDate(value) {
+  return value ? new Intl.DateTimeFormat('en-IN', {day:'2-digit', month:'short', year:'numeric'}).format(new Date(value)) : '—';
+}
+function renderIssues(issues, source = 'local') {
+  const list = $('issuesList');
+  if (!issues.length) {
+    list.innerHTML = '<div class="empty-issues"><strong>No issues yet</strong><span>Submit a complaint and its reference will appear here.</span></div>';
+    return;
+  }
+  list.innerHTML = issues.map((issue) => {
+    const updates = issue.updates || issue.issue_updates || [];
+    const timeline = updates.map((item) => `<li><span></span><div><strong>${escapeHtml(statusLabels[item.status] || item.status || 'Update')}</strong><small>${escapeHtml(item.message || '')} · ${formatDate(item.created_at)}</small></div></li>`).join('');
+    return `<article class="issue-card"><div class="issue-card-top"><span class="issue-ref">${escapeHtml(issue.reference_id || issue.id)}</span><span class="status-pill status-${escapeHtml(issue.status || 'submitted')}">${escapeHtml(statusLabels[issue.status] || 'Submitted')}</span></div><h3>${escapeHtml(issue.title)}</h3><p class="issue-meta">${escapeHtml(issue.category)} · Submitted ${formatDate(issue.submitted_at)} · Updated ${formatDate(issue.updated_at)}</p><ol class="issue-timeline">${timeline || '<li><span></span><div><strong>Submitted</strong><small>Complaint submitted for review.</small></div></li>'}</ol></article>`;
+  }).join('');
+  list.dataset.source = source;
+}
+async function openTracking() {
+  $('trackingBackdrop').hidden = false;
+  $('issuesList').innerHTML = '<div class="empty-issues">Loading your issues…</div>';
+  let issues = localIssues();
+  try {
+    const response = await fetch(`/api/issues?device_id=${encodeURIComponent(deviceId)}`);
+    if (response.ok) {
+      const result = await response.json();
+      if (Array.isArray(result.issues) && result.issues.length) issues = result.issues;
+    }
+  } catch {}
+  renderIssues(issues);
+}
 
 const WELCOME_HTML = `<div class="date-stamp">Today</div><div class="message assistant-message"><div class="avatar assistant-avatar" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8L12 3z" fill="currentColor"/></svg></div><div class="bubble"><p>Hi. Tell me what happened in your own words — no formal language needed.</p><p><strong>I’ll only ask about what’s still missing.</strong></p></div></div>`;
 const FIELD_DEFAULTS = {what:'Waiting for your story', who:'Seller or service provider', when:'Date and location', relief:'Refund, replacement or other relief'};
@@ -471,14 +566,12 @@ setListeningUi(false);
 $('voiceToggle').onclick=()=>{state.speaking=!state.speaking; $('voiceToggle').textContent=state.speaking?'🔊':'🔇'; $('voiceToggle').setAttribute('aria-pressed', String(state.speaking)); $('voiceToggle').title=state.speaking?'Voice replies on':'Voice replies off'; if(!state.speaking){window.speechSynthesis?.cancel(); state.audio?.pause();} persist();};
 $('verificationClose').onclick=()=>{$('verificationBackdrop').hidden=true};
 $('verificationBackdrop').onclick=(event)=>{if(event.target===$('verificationBackdrop'))$('verificationBackdrop').hidden=true};
+$('trackIssuesButton').onclick=openTracking;
+$('trackingClose').onclick=()=>{$('trackingBackdrop').hidden=true};
+$('trackingBackdrop').onclick=(event)=>{if(event.target===$('trackingBackdrop'))$('trackingBackdrop').hidden=true};
+document.querySelectorAll('input[name="contactChannel"]').forEach((input) => input.addEventListener('change', renderContactFields));
 $('skipVerification').onclick=()=>{$('verificationBackdrop').hidden=true; submit();};
-$('verifyButton').onclick=()=>{
-  const mobile=$('demoMobile').value.replace(/\D/g,'');
-  if(mobile.length!==10 || $('demoOtp').value.length!==6 || $('demoCaptcha').value.trim().toUpperCase()!=='7K4M'){
-    $('verificationTitle').textContent='One small detail to check'; return;
-  }
-  $('verificationBackdrop').hidden=true; submit();
-};
+$('verifyButton').onclick=()=>submit();
 renderState();
 showSuggestions();
 if ('speechSynthesis' in window) window.speechSynthesis.getVoices();

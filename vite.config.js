@@ -3,6 +3,7 @@ import complaintTurn from './api/complaint-turn.js';
 import transcribe from './api/transcribe.js';
 import speak from './api/speak.js';
 import health from './api/health.js';
+import issues from './api/issues.js';
 
 function localResponse(res) {
   return {
@@ -29,8 +30,9 @@ export default defineConfig(({mode}) => {
       configureServer(server){
         server.middlewares.use('/api', async (req,res,next)=>{
           const path=req.url?.split('?')[0];
-          const handlers={'/complaint-turn':complaintTurn,'/transcribe':transcribe,'/speak':speak,'/health':health};
+          const handlers={'/complaint-turn':complaintTurn,'/transcribe':transcribe,'/speak':speak,'/health':health,'/issues':issues};
           if(!handlers[path]) return next();
+          req.query=Object.fromEntries(new URLSearchParams(req.url?.split('?')[1] || ''));
           req.body=await parseBody(req);
           try {await handlers[path](req,localResponse(res));} catch {res.statusCode=204; res.end();}
         });
