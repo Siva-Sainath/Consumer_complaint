@@ -461,7 +461,12 @@ async function openTracking() {
 async function loadIssues() {
   $('issuesList').innerHTML = '<div class="empty-issues">Loading your issues…</div>';
   try {
-    const response = await fetch(`/api/issues?device_id=${encodeURIComponent(deviceId)}`);
+    const url = `/api/issues?device_id=${encodeURIComponent(deviceId)}`;
+    let response = await fetch(url);
+    if (!response.ok) {
+      await new Promise((resolve) => setTimeout(resolve, 900));
+      response = await fetch(url);
+    }
     if (!response.ok) throw new Error('Issue tracking unavailable');
     const result = await response.json();
     renderIssues(Array.isArray(result.issues) ? result.issues : [], result.source);
