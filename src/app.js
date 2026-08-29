@@ -186,9 +186,10 @@ function missingField() {
   if (!state.fields.relief) return 'relief';
   return null;
 }
-function deterministicReply() {
+function deterministicReply(text = '') {
   const missing = missingField();
   if (state.outOfScope) return `I understand. This is ${state.outOfScope}, so the consumer grievance route isn’t the right avenue. ${scopeGuidance[state.outOfScope]} I can still help with a product or service issue.`;
+  if (!state.fields.what && !state.fields.who && !state.fields.when) return 'I’m here to help with a product or service problem. Tell me what happened, and I’ll help capture the details calmly.';
   if (!missing) return `Thank you — I’ve captured the complaint and the incident details. You can attach a receipt, bill, photo, or video if you have one, then tap Review your complaint.`;
   if (missing === 'who') return 'That sounds really frustrating. Who was the seller or service provider? Even an approximate name is fine.';
   if (missing === 'when') return 'Got it. When and where did this happen? A rough date and city or area is enough.';
@@ -285,7 +286,7 @@ function respond(text, modelResult = null) {
   let reply;
   const missing = missingField();
   const modelReply = String(modelResult?.spoken_response || '').trim();
-  reply = modelReply && !modelAskedForCompletedDetail(modelReply) ? modelReply : deterministicReply();
+  reply = modelReply && !modelAskedForCompletedDetail(modelReply) ? modelReply : deterministicReply(text);
   addMessage(reply);
   speak(reply);
 }
