@@ -373,12 +373,15 @@ function renderIssues(issues, source = 'local') {
   list.innerHTML = issues.map((issue) => {
     const updates = issue.updates || issue.issue_updates || [];
     const timeline = updates.map((item) => `<li><span></span><div><strong>${escapeHtml(statusLabels[item.status] || item.status || 'Update')}</strong><small>${escapeHtml(item.message || '')} · ${formatDate(item.created_at)}</small></div></li>`).join('');
-    return `<article class="issue-card"><div class="issue-card-top"><span class="issue-ref">${escapeHtml(issue.reference_id || issue.id)}</span><span class="status-pill status-${escapeHtml(issue.status || 'submitted')}">${escapeHtml(statusLabels[issue.status] || 'Submitted')}</span></div><h3>${escapeHtml(issue.title)}</h3><p class="issue-meta">${escapeHtml(issue.category)} · Submitted ${formatDate(issue.submitted_at)} · Updated ${formatDate(issue.updated_at)}</p><ol class="issue-timeline">${timeline || '<li><span></span><div><strong>Submitted</strong><small>Complaint submitted for review.</small></div></li>'}</ol></article>`;
+    const channels = (issue.contact_preferences || []).map((item) => item.channel).filter(Boolean).join(', ');
+    return `<article class="issue-card"><div class="issue-card-top"><span class="issue-ref">${escapeHtml(issue.reference_id || issue.id)}</span><span class="status-pill status-${escapeHtml(issue.status || 'submitted')}">${escapeHtml(statusLabels[issue.status] || 'Submitted')}</span></div><h3>${escapeHtml(issue.title)}</h3><p class="issue-meta">${escapeHtml(issue.category)} · Submitted ${formatDate(issue.submitted_at)} · Updated ${formatDate(issue.updated_at)}</p>${channels ? `<p class="issue-contact">Updates via ${escapeHtml(channels)}</p>` : ''}<ol class="issue-timeline">${timeline || '<li><span></span><div><strong>Submitted</strong><small>Complaint submitted for review.</small></div></li>'}</ol></article>`;
   }).join('');
   list.dataset.source = source;
 }
 async function openTracking() {
-  $('trackingBackdrop').hidden = false;
+  window.location.hash = 'track';
+}
+async function loadIssues() {
   $('issuesList').innerHTML = '<div class="empty-issues">Loading your issues…</div>';
   let issues = localIssues();
   try {
@@ -389,6 +392,27 @@ async function openTracking() {
     }
   } catch {}
   renderIssues(issues);
+}
+function showPage() {
+  const tracking = window.location.hash === '#track';
+  $('top').hidden = tracking;
+  $('trackingPage').hidden = !tracking;
+  if (tracking) loadIssues();
+}
+async function findIssue() {
+  const rawQuery = $('trackingReference').value.trim();
+  const query = rawQuery.toLowerCase();
+  if (!query) return loadIssues();
+  let issue = localIssues().find((item) => String(item.reference_id || item.id).toLowerCase() === query);
+  if (!issue) {
+    try {
+      const response = await fetch(`/api/issues?device_id=${encodeURIComponent(deviceId)}&reference_id=${encodeURIComponent(rawQuery)}`);
+      const result = await response.json();
+      issue = result.issues?.[0];
+    } catch {}
+  }
+  if (issue) renderIssues([issue]);
+  else $('issuesList').innerHTML = '<div class="empty-issues"><strong>We couldn’t find that reference</strong><span>Check the ID and try again, or view complaints raised on this device.</span></div>';
 }
 
 const WELCOME_HTML = `<div class="date-stamp">Today</div><div class="message assistant-message"><div class="avatar assistant-avatar" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8L12 3z" fill="currentColor"/></svg></div><div class="bubble"><p>Hi. Tell me what happened in your own words — no formal language needed.</p><p><strong>I’ll only ask about what’s still missing.</strong></p></div></div>`;
@@ -569,7 +593,7 @@ $('micButton').onclick = () => {
   else startVoiceTurn();
 };
 $('helpButton').onclick=()=>{$('modalBackdrop').hidden=false}; $('modalClose').onclick=()=>{$('modalBackdrop').hidden=true}; $('modalBackdrop').onclick=e=>{if(e.target===$('modalBackdrop'))$('modalBackdrop').hidden=true};
-$('newChatButton').onclick=startNewChat;
+$('newChatButton').onclick=()=>{window.location.hash=''; startNewChat();};
 state.speaking = true;
 function updateVoiceToggle() {
   const icon = state.speaking
@@ -587,8 +611,11 @@ $('voiceToggle').onclick=()=>{state.speaking=!state.speaking; updateVoiceToggle(
 $('verificationClose').onclick=()=>{$('verificationBackdrop').hidden=true};
 $('verificationBackdrop').onclick=(event)=>{if(event.target===$('verificationBackdrop'))$('verificationBackdrop').hidden=true};
 $('trackIssuesButton').onclick=openTracking;
-$('trackingClose').onclick=()=>{$('trackingBackdrop').hidden=true};
-$('trackingBackdrop').onclick=(event)=>{if(event.target===$('trackingBackdrop'))$('trackingBackdrop').hidden=true};
+$('raiseComplaintButton').onclick=()=>{window.location.hash=''; document.querySelector('.workspace')?.scrollIntoView({behavior:'smooth'});};
+$('whereBelongsButton').onclick=()=>{window.location.hash=''; document.querySelector('.workspace')?.scrollIntoView({behavior:'smooth'}); input.value='Where does this issue belong? '; input.focus();};
+$('backToComplaint').onclick=()=>{window.location.hash='';};
+$('findIssueButton').onclick=findIssue;
+$('trackingReference').addEventListener('keydown',(event)=>{if(event.key==='Enter')findIssue();});
 document.querySelectorAll('input[name="contactChannel"]').forEach((input) => input.addEventListener('change', renderContactFields));
 $('skipVerification').onclick=()=>{$('verificationBackdrop').hidden=true; submit();};
 $('verifyButton').onclick=()=>submit();
@@ -596,3 +623,5 @@ renderState();
 showSuggestions();
 if ('speechSynthesis' in window) window.speechSynthesis.getVoices();
 fetch('/api/health').catch(() => {});
+window.addEventListener('hashchange', showPage);
+showPage();

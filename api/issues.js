@@ -72,7 +72,9 @@ export default async function handler(req, res) {
   try {
     if (req.method === 'GET') {
       if (!supabaseConfigured()) return res.status(200).json({issues: [], source: 'local'});
-      const issues = await supabaseRequest(`issues?device_id=eq.${encodeURIComponent(deviceId)}&select=*,issue_updates(*)&order=updated_at.desc`);
+      const reference = String(req.query?.reference_id || '').slice(0, 120);
+      const referenceFilter = reference ? `&reference_id=eq.${encodeURIComponent(reference)}` : '';
+      const issues = await supabaseRequest(`issues?device_id=eq.${encodeURIComponent(deviceId)}${referenceFilter}&select=*,issue_updates(*)&order=updated_at.desc`);
       return res.status(200).json({issues, source: 'supabase'});
     }
 
