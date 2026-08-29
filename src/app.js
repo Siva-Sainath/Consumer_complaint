@@ -348,7 +348,12 @@ async function processVoiceTurn(blob, mimeType) {
   }
   try {
     const text = await transcribeBlob(new Blob([blob], {type: mimeType || blob.type}));
-    if (text) { input.value = text; send(); return; }
+    if (text) {
+      finishListening();
+      input.value = text;
+      send();
+      return;
+    }
     finishListening();
     $('voiceHint').textContent='I couldn’t catch that — type your complaint below';
     input.focus();
