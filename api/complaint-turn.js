@@ -31,7 +31,17 @@ export default async function handler(req, res) {
           generationConfig:{
             temperature:0.2,
             maxOutputTokens:1200,
-            responseMimeType:'application/json'
+            responseMimeType:'application/json',
+            responseSchema:{
+              type:'OBJECT',
+              properties:{
+                spoken_response:{type:'STRING'},
+                extracted_fields:{type:'OBJECT', additionalProperties:{type:'STRING'}},
+                routing:{type:'STRING'},
+                ui_suggestions:{type:'ARRAY', items:{type:'STRING'}}
+              },
+              required:['spoken_response','extracted_fields','routing','ui_suggestions']
+            }
           }
         }),
         signal:controller.signal
