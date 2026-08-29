@@ -13,41 +13,30 @@ Use only these routing values: National Consumer Helpline, Legal Metrology, FSSA
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({error:'Method not allowed'});
-  if (!process.env.GROQ_API_KEY) return res.status(503).json({error:'AI response service is not configured'});
+  if (!process.env.GEMINI_API_KEY) return res.status(503).json({error:'AI response service is not configured'});
   const { text, current_fields = {} } = req.body || {};
   if (!text) return res.status(400).json({error:'Text is required'});
   const prompt = `Current extracted fields: ${JSON.stringify(current_fields)}\nCitizen message: ${text}`;
   try {
-    let upstream;
-    for (const model of ['openai/gpt-oss-120b', 'openai/gpt-oss-20b']) {
-      upstream = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {'Authorization': `Bearer ${process.env.GROQ_API_KEY}`, 'Content-Type':'application/json'},
-      body: JSON.stringify({
-        model,
-        temperature: 0.2,
-        max_tokens: 800,
-        response_format: {type:'json_object'},
-        messages: [{role:'system', content:SYSTEM_PROMPT}, {role:'user', content:prompt}]
-      })
-      });
-      if (upstream.status === 400) {
-        upstream = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-          method: 'POST',
-          headers: {'Authorization': `Bearer ${process.env.GROQ_API_KEY}`, 'Content-Type':'application/json'},
-          body: JSON.stringify({
-            model,
-            temperature: 0.2,
-            max_tokens: 800,
-            messages: [{role:'system', content:SYSTEM_PROMPT}, {role:'user', content:prompt + '\nRespond with valid JSON only.'}]
-          })
-        });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20000);
+    const upstream = await fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+      {
+        method:'POST',
+        headers:{'Content-Type':'application/json', 'x-goog-api-key':process.env.GEMINI_API_KEY},
+        body:JSON.stringify({
+          systemInstruction:{parts:[{text:SYSTEM_PROMPT}]},
+          contents:[{role:'user', parts:[{text:`${prompt}\nRespond with valid JSON only.`}]}],
+          generationConfig:{temperature:0.2, maxOutputTokens:800, responseMimeType:'application/json'}
+        }),
+        signal:controller.signal
       }
-      if (upstream.ok) break;
-    }
+    );
+    clearTimeout(timeout);
     if (!upstream.ok) return res.status(502).json({error:'AI response service is unavailable'});
     const payload = await upstream.json();
-    const content = payload.choices?.[0]?.message?.content || '';
+    const content = payload.candidates?.[0]?.content?.parts?.map((part) => part.text || '').join('') || '';
     const result = JSON.parse(content.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim());
     const allowedFields = new Set(['what', 'category', 'product_or_service', 'who', 'when', 'location', 'amount_paid', 'order_reference', 'relief', 'evidence']);
     const extracted_fields = Object.fromEntries(
@@ -55,7 +44,7 @@ export default async function handler(req, res) {
         .filter(([key, value]) => allowedFields.has(key) && typeof value === 'string' && value.trim())
         .map(([key, value]) => [key, value.trim()])
     );
-    if (!result.spoken_response || typeof result.spoken_response !== 'string') return res.status(204).end();
+    if (!result.spoken_response || typeof result.spoken_response !== 'string') return res.status(502).json({error:'AI response was incomplete'});
     return res.status(200).json({
       spoken_response: String(result.spoken_response),
       extracted_fields,

@@ -218,9 +218,9 @@ async function speak(text) {
   }
   speakNative(plain);
 }
-async function callGroq(text) {
+async function callGemini(text) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 20000);
+  const timeout = setTimeout(() => controller.abort(), 30000);
   try {
     const response = await fetch('/api/complaint-turn', {
       method: 'POST', headers: {'Content-Type':'application/json'},
@@ -353,11 +353,11 @@ async function send() {
   persist(); renderState(); setVoicePhase('THINKING'); showSuggestions();
   const place = locationPhrase(text);
   if (place && !state.location?.approved) { state.location={query:place, loading:false, result:null, approved:false}; persist(); showSuggestions(); }
-  const result = await callGroq(text);
+  const result = await callGemini(text);
   if (result?.extracted_fields) {
     mergeFields(result.extracted_fields);
     if (result.routing && !state.outOfScope) state.fields.route = result.routing;
-    state.aiMode = 'Groq enhanced';
+    state.aiMode = 'Gemini enhanced';
   } else {
     state.aiMode = 'AI response unavailable';
   }
