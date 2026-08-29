@@ -36,7 +36,14 @@ export default async function handler(req, res) {
               type:'OBJECT',
               properties:{
                 spoken_response:{type:'STRING'},
-                extracted_fields:{type:'OBJECT', additionalProperties:{type:'STRING'}},
+                extracted_fields:{
+                  type:'OBJECT',
+                  properties:{
+                    what:{type:'STRING'}, category:{type:'STRING'}, product_or_service:{type:'STRING'},
+                    who:{type:'STRING'}, when:{type:'STRING'}, location:{type:'STRING'},
+                    amount_paid:{type:'STRING'}, order_reference:{type:'STRING'}, relief:{type:'STRING'}, evidence:{type:'STRING'}
+                  }
+                },
                 routing:{type:'STRING'},
                 ui_suggestions:{type:'ARRAY', items:{type:'STRING'}}
               },
