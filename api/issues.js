@@ -1,5 +1,18 @@
+function supabaseUrl() {
+  return process.env.SUPABASE_URL || process.env.SUPABASE_PROJECT_URL;
+}
+
+function supabaseKeys() {
+  return [...new Set([
+    process.env.SUPABASE_PUBLISHABLE_KEY,
+    process.env.SUPABASE_ANON_KEY,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    process.env.SUPABASE_KEY
+  ].filter(Boolean))];
+}
+
 function supabaseConfigured() {
-  return Boolean(process.env.SUPABASE_URL && (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY));
+  return Boolean(supabaseUrl() && supabaseKeys().length);
 }
 
 function headers(key) {
@@ -45,13 +58,10 @@ function cleanIssue(input = {}) {
 }
 
 async function supabaseRequest(path, options = {}) {
-  const keys = [...new Set([
-    process.env.SUPABASE_ANON_KEY,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-  ].filter(Boolean))];
+  const keys = supabaseKeys();
   let lastStatus = 502;
   for (const key of keys) {
-    const response = await fetch(`${process.env.SUPABASE_URL}/rest/v1/${path}`, {
+    const response = await fetch(`${supabaseUrl()}/rest/v1/${path}`, {
       ...options,
       headers: {...headers(key), ...(options.headers || {})}
     });
