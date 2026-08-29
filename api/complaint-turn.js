@@ -18,49 +18,36 @@ export default async function handler(req, res) {
   if (!text) return res.status(400).json({error:'Text is required'});
   const prompt = `Current extracted fields: ${JSON.stringify(current_fields)}\nCitizen message: ${text}`;
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 45000);
-    const upstream = await fetch(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent',
-      {
-        method:'POST',
-        headers:{'Content-Type':'application/json', 'x-goog-api-key':process.env.GEMINI_API_KEY},
-        body:JSON.stringify({
-          systemInstruction:{parts:[{text:SYSTEM_PROMPT}]},
-          contents:[{role:'user', parts:[{text:`${prompt}\nRespond with valid JSON only.`}]}],
-          generationConfig:{
-            temperature:0.2,
-            maxOutputTokens:1200,
-            responseMimeType:'application/json',
-            responseSchema:{
-              type:'OBJECT',
-              properties:{
-                spoken_response:{type:'STRING'},
-                extracted_fields:{
-                  type:'OBJECT',
-                  properties:{
-                    what:{type:'STRING'}, category:{type:'STRING'}, product_or_service:{type:'STRING'},
-                    who:{type:'STRING'}, when:{type:'STRING'}, location:{type:'STRING'},
-                    amount_paid:{type:'STRING'}, order_reference:{type:'STRING'}, relief:{type:'STRING'}, evidence:{type:'STRING'}
-                  }
-                },
-                routing:{type:'STRING'},
-                ui_suggestions:{type:'ARRAY', items:{type:'STRING'}}
-              },
-              required:['spoken_response','extracted_fields','routing','ui_suggestions']
-            }
+    let payload;
+    for (const model of ['gemini-3.1-flash-lite', 'gemini-3.6-flash']) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 12000);
+      try {
+        const upstream = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+          {
+            method:'POST',
+            headers:{'Content-Type':'application/json', 'x-goog-api-key':process.env.GEMINI_API_KEY},
+            body:JSON.stringify({
+              systemInstruction:{parts:[{text:SYSTEM_PROMPT}]},
+              contents:[{role:'user', parts:[{text:`${prompt}\nRespond with one compact valid JSON object only.`}]}],
+              generationConfig:{temperature:0.2, maxOutputTokens:700, responseMimeType:'application/json'}
+            }),
+            signal:controller.signal
           }
-        }),
-        signal:controller.signal
+        );
+        if (upstream.ok) {
+          payload = await upstream.json();
+          break;
+        }
+        console.error(`Gemini ${model} error`, await upstream.text());
+      } catch (error) {
+        console.error(`Gemini ${model} request failed`, error?.name || 'unknown');
+      } finally {
+        clearTimeout(timeout);
       }
-    );
-    clearTimeout(timeout);
-    if (!upstream.ok) {
-      const detail = await upstream.text();
-      console.error('Gemini reasoning error', detail);
-      return res.status(502).json({error:'AI response service is unavailable'});
     }
-    const payload = await upstream.json();
+    if (!payload) return res.status(502).json({error:'AI response service is unavailable'});
     const content = payload.candidates?.[0]?.content?.parts?.map((part) => part.text || '').join('') || '';
     const cleaned = content.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
     const jsonStart = cleaned.indexOf('{');
