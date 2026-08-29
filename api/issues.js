@@ -1,5 +1,3 @@
-const statuses = new Set(['submitted', 'under_review', 'awaiting_user_response', 'escalated', 'resolved', 'closed']);
-
 function supabaseConfigured() {
   return Boolean(process.env.SUPABASE_URL && (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY));
 }
@@ -41,20 +39,6 @@ function cleanIssue(input = {}) {
   };
 }
 
-function mockIssue(input) {
-  const issue = cleanIssue(input);
-  const now = new Date().toISOString();
-  return {
-    id: `demo-${Date.now()}-${Math.floor(Math.random() * 900 + 100)}`,
-    reference_id: `NCH-DEMO-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`,
-    ...issue,
-    submitted_at: now,
-    updated_at: now,
-    recent_update: 'Complaint submitted for review.',
-    updates: [{ status: 'submitted', message: 'Complaint submitted for review.', created_at: now }]
-  };
-}
-
 async function supabaseRequest(path, options = {}) {
   const response = await fetch(`${process.env.SUPABASE_URL}/rest/v1/${path}`, {
     ...options,
@@ -68,10 +52,10 @@ export default async function handler(req, res) {
   if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).json({error: 'Method not allowed'});
   const deviceId = String(req.method === 'GET' ? req.query?.device_id : req.body?.device_id || '').slice(0, 80);
   if (!deviceId) return res.status(400).json({error: 'A demo device ID is required'});
+  if (!supabaseConfigured()) return res.status(503).json({error: 'Issue tracking is not configured'});
 
   try {
     if (req.method === 'GET') {
-      if (!supabaseConfigured()) return res.status(200).json({issues: [], source: 'local'});
       const reference = String(req.query?.reference_id || '').slice(0, 120);
       const referenceFilter = reference ? `&reference_id=eq.${encodeURIComponent(reference)}` : '';
       const issues = await supabaseRequest(`issues?device_id=eq.${encodeURIComponent(deviceId)}${referenceFilter}&select=*,issue_updates(*)&order=updated_at.desc`);
@@ -90,8 +74,8 @@ export default async function handler(req, res) {
       });
       return res.status(200).json({issue: {...saved, updates: [{status: 'submitted', message: 'Complaint submitted for review.', created_at: now}]}, source: 'supabase'});
     }
-    return res.status(200).json({issue: mockIssue(req.body), source: 'local'});
+    return res.status(503).json({error: 'Issue tracking is not configured'});
   } catch {
-    return res.status(200).json({issue: req.method === 'POST' ? mockIssue(req.body) : undefined, issues: req.method === 'GET' ? [] : undefined, source: 'local-fallback'});
+    return res.status(502).json({error: 'Issue tracking is temporarily unavailable'});
   }
 }

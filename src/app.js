@@ -2,7 +2,6 @@
 // may be cached separately, but complaint content is never restored.
 const state = { fields:{}, messages:0, voicePhase:'IDLE', submitted:false, docket:'', location:null, speaking:true };
 const DEVICE_KEY = 'consumer-copilot-demo-device';
-const ISSUE_KEY = 'consumer-copilot-demo-issues';
 const deviceId = localStorage.getItem(DEVICE_KEY) || (() => {
   const id = `device-${crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`}`;
   localStorage.setItem(DEVICE_KEY, id);
@@ -35,13 +34,6 @@ const escapeHtml = (value = '') => String(value).replace(/[&<>"']/g, (char) => (
 }[char]));
 function persist() {
   // Keep the live complaint in memory only so a hard refresh clears the chat.
-}
-function localIssues() {
-  try { return JSON.parse(localStorage.getItem(ISSUE_KEY) || '[]'); } catch { return []; }
-}
-function saveLocalIssue(issue) {
-  const issues = [issue, ...localIssues().filter((item) => item.id !== issue.id)].slice(0, 20);
-  localStorage.setItem(ISSUE_KEY, JSON.stringify(issues));
 }
 function locationPhrase(text) {
   const match = text.match(/\b(?:at|near|in|from|में|पर|के पास)\s+([^,.!?]{3,70})/i);
@@ -300,7 +292,7 @@ function openVerification() {
   if (state.submitted) return;
   renderContactFields();
   $('verificationBackdrop').hidden=false;
-  $('demoMobile').focus();
+  $('contactFields').querySelector('input')?.focus();
 }
 function renderContactFields() {
   const selected = [...document.querySelectorAll('input[name="contactChannel"]:checked')].map((input) => input.value);
@@ -341,9 +333,14 @@ async function submit() {
   submitButton.disabled = true;
   submitButton.textContent = 'Creating your issue…';
   let result;
-  try { result = await createIssue(contacts); } catch { result = {issue: createLocalIssue(contacts), source:'local-fallback'}; }
+  try { result = await createIssue(contacts); } catch {
+    submitButton.disabled = false;
+    submitButton.textContent = 'Create mock issue';
+    document.querySelector('.submission-error')?.remove();
+    $('verificationTitle').insertAdjacentHTML('afterend', '<p class="submission-error">The online issue service is unavailable. Your complaint was not submitted. Please try again.</p>');
+    return;
+  }
   const issue = result.issue;
-  saveLocalIssue(issue);
   state.submitted=true; state.docket=issue.reference_id; persist();
   $('verificationBackdrop').hidden=true;
   addMessage('Done. Your mock complaint is logged. Keep this number if you want to follow up in this demo.'); speak('Done. Your mock complaint is logged.');
@@ -351,10 +348,6 @@ async function submit() {
   suggestions.innerHTML=''; const restart=document.createElement('button'); restart.className='suggestion'; restart.textContent='Start another complaint'; restart.onclick=resetDemo; suggestions.append(restart); renderState();
   submitButton.disabled = false;
   submitButton.textContent = 'Create mock issue';
-}
-function createLocalIssue(contacts) {
-  const now = new Date().toISOString();
-  return {id:`local-${Date.now()}`, reference_id:`NCH-DEMO-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`, title:state.fields.what || 'Consumer complaint', category:state.fields.route || 'National Consumer Helpline', status:'submitted', details:{...state.fields}, contact_preferences:contacts, submitted_at:now, updated_at:now, recent_update:'Complaint submitted for review.', updates:[{status:'submitted', message:'Complaint submitted for review.', created_at:now}]};
 }
 function resetDemo() { startNewChat(); }
 const statusLabels = {
@@ -383,15 +376,15 @@ async function openTracking() {
 }
 async function loadIssues() {
   $('issuesList').innerHTML = '<div class="empty-issues">Loading your issues…</div>';
-  let issues = localIssues();
   try {
     const response = await fetch(`/api/issues?device_id=${encodeURIComponent(deviceId)}`);
-    if (response.ok) {
-      const result = await response.json();
-      if (Array.isArray(result.issues) && result.issues.length) issues = result.issues;
-    }
-  } catch {}
-  renderIssues(issues);
+    if (!response.ok) throw new Error('Issue tracking unavailable');
+    const result = await response.json();
+    renderIssues(Array.isArray(result.issues) ? result.issues : [], result.source);
+  } catch {
+    $('issuesList').innerHTML = '<div class="empty-issues"><strong>Issue tracking is temporarily unavailable</strong><span>Please try again in a moment. Your complaint is not being stored in this browser.</span><button class="secondary-action retry-issues" type="button">Try again</button></div>';
+    $('issuesList').querySelector('.retry-issues')?.addEventListener('click', loadIssues);
+  }
 }
 function showPage() {
   const tracking = window.location.hash === '#track';
@@ -403,14 +396,13 @@ async function findIssue() {
   const rawQuery = $('trackingReference').value.trim();
   const query = rawQuery.toLowerCase();
   if (!query) return loadIssues();
-  let issue = localIssues().find((item) => String(item.reference_id || item.id).toLowerCase() === query);
-  if (!issue) {
-    try {
-      const response = await fetch(`/api/issues?device_id=${encodeURIComponent(deviceId)}&reference_id=${encodeURIComponent(rawQuery)}`);
-      const result = await response.json();
-      issue = result.issues?.[0];
-    } catch {}
-  }
+  let issue;
+  try {
+    const response = await fetch(`/api/issues?device_id=${encodeURIComponent(deviceId)}&reference_id=${encodeURIComponent(rawQuery)}`);
+    if (!response.ok) throw new Error('Issue lookup unavailable');
+    const result = await response.json();
+    issue = result.issues?.[0];
+  } catch {}
   if (issue) renderIssues([issue]);
   else $('issuesList').innerHTML = '<div class="empty-issues"><strong>We couldn’t find that reference</strong><span>Check the ID and try again, or view complaints raised on this device.</span></div>';
 }
@@ -617,7 +609,7 @@ $('backToComplaint').onclick=()=>{window.location.hash='';};
 $('findIssueButton').onclick=findIssue;
 $('trackingReference').addEventListener('keydown',(event)=>{if(event.key==='Enter')findIssue();});
 document.querySelectorAll('input[name="contactChannel"]').forEach((input) => input.addEventListener('change', renderContactFields));
-$('skipVerification').onclick=()=>{$('verificationBackdrop').hidden=true; submit();};
+$('skipVerification').onclick=()=>{document.querySelectorAll('input[name="contactChannel"]').forEach((input) => { input.checked = false; }); renderContactFields(); submit();};
 $('verifyButton').onclick=()=>submit();
 renderState();
 showSuggestions();
