@@ -1,0 +1,6 @@
+.env
+.env.*
+!.env.example
+*.md
+backend/
+consumer-copilot-codex-spec-v2.md
