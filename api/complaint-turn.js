@@ -21,7 +21,7 @@ export default async function handler(req, res) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 20000);
     const upstream = await fetch(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent',
       {
         method:'POST',
         headers:{'Content-Type':'application/json', 'x-goog-api-key':process.env.GEMINI_API_KEY},
@@ -37,7 +37,7 @@ export default async function handler(req, res) {
     if (!upstream.ok) {
       const detail = await upstream.text();
       console.error('Gemini reasoning error', detail);
-      return res.status(502).json({error:'AI response service is unavailable', detail:detail.slice(0, 300)});
+      return res.status(502).json({error:'AI response service is unavailable'});
     }
     const payload = await upstream.json();
     const content = payload.candidates?.[0]?.content?.parts?.map((part) => part.text || '').join('') || '';
